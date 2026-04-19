@@ -1,0 +1,7 @@
+The gradle-wrapper.jar file must be present to build.
+Android Studio will add it automatically when you open the project.
+
+OR run this from the project root:
+  gradle wrapper --gradle-version 8.4
+
+OR use the GitHub Actions workflow which handles this automatically.

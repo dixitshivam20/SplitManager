@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- ₹ symbol from the SVG logo, scaled to 24dp status bar icon -->
+    <!-- Status bar icons must be single color — Android tints them automatically -->
+
+    <!-- Top horizontal bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:pathData="M73,50 L130,50"/>
+
+    <!-- Arch (top curve of ₹) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M78,50 C78,50 126,50 126,69 C126,88 78,88 78,88"/>
+
+    <!-- Mid horizontal bar -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M73,69 L120,69"/>
+
+    <!-- Diagonal leg -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M78,88 L128,120"/>
+
+</vector>

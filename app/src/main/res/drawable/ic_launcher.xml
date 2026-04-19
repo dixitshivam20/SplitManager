@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Background rounded rect (radialGradient not supported in VectorDrawable — use solid closest to center color) -->
+    <path
+        android:fillColor="#2E7040"
+        android:pathData="M46,0 L154,0 Q200,0 200,46 L200,154 Q200,200 154,200 L46,200 Q0,200 0,154 L0,46 Q0,0 46,0 Z"/>
+
+    <!-- Inner border subtle -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.06"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M48,9 L152,9 Q191,9 191,48 L191,152 Q191,191 152,191 L48,191 Q9,191 9,152 L9,48 Q9,9 48,9 Z"/>
+
+    <!-- Brain left half fill -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.06"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeAlpha="0.15"
+        android:strokeLineCap="round"
+        android:pathData="M100,40 C88,38 72,43 63,56 C53,69 51,84 55,97 C49,106 49,119 57,130 C64,141 76,147 88,147 C92,148 96,148 100,147"/>
+
+    <!-- Brain left wrinkle 1 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.10"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M68,62 C62,73 64,90 72,97"/>
+
+    <!-- Brain left wrinkle 2 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.10"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M56,106 C62,115 70,121 75,128"/>
+
+    <!-- Brain left wrinkle 3 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.10"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M79,44 C75,56 75,73 81,83"/>
+
+    <!-- Brain right half fill -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.06"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeAlpha="0.15"
+        android:strokeLineCap="round"
+        android:pathData="M100,40 C112,38 128,43 137,56 C147,69 149,84 145,97 C151,106 151,119 143,130 C136,141 124,147 112,147 C108,148 104,148 100,147"/>
+
+    <!-- Brain right wrinkle 1 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.10"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M132,62 C138,73 136,90 128,97"/>
+
+    <!-- Brain right wrinkle 2 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.10"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M144,106 C138,115 130,121 125,128"/>
+
+    <!-- Brain right wrinkle 3 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.10"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M121,44 C125,56 125,73 119,83"/>
+
+    <!-- Rupee top horizontal bar -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M73,50 L130,50"/>
+
+    <!-- Rupee arch (top curve) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M78,50 C78,50 126,50 126,69 C126,88 78,88 78,88"/>
+
+    <!-- Rupee mid horizontal bar -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M73,69 L120,69"/>
+
+    <!-- Rupee diagonal leg -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M78,88 L128,120"/>
+
+    <!-- Split fork left arm -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.42"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M100,128 Q76,136 62,156"/>
+
+    <!-- Split fork left arrowhead -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.42"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M54,147 L62,158 L73,150"/>
+
+    <!-- Split fork right arm -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.42"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M100,128 Q124,136 138,156"/>
+
+    <!-- Split fork right arrowhead -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.42"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M146,147 L138,158 L127,150"/>
+
+    <!-- Neural dot left -->
+    <path
+        android:fillColor="#FFD746"
+        android:fillAlpha="0.75"
+        android:pathData="M52,44 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"/>
+
+    <!-- Neural dot right -->
+    <path
+        android:fillColor="#FFD746"
+        android:fillAlpha="0.75"
+        android:pathData="M148,44 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"/>
+
+    <!-- Neural dot left mid -->
+    <path
+        android:fillColor="#FFD746"
+        android:fillAlpha="0.50"
+        android:pathData="M38,97 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
+
+    <!-- Neural dot right mid -->
+    <path
+        android:fillColor="#FFD746"
+        android:fillAlpha="0.50"
+        android:pathData="M162,97 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
+
+</vector>
