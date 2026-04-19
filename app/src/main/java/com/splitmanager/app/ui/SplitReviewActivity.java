@@ -50,6 +50,9 @@ public class SplitReviewActivity extends AppCompatActivity {
     private final Map<Long, CheckBox> memberCheckboxes   = new HashMap<>();
     private final Map<Long, EditText> memberAmountInputs = new HashMap<>();
 
+    // Tracks which members have been manually edited in Custom mode (locked from auto-redistribution)
+    private final Set<Long> manuallyEditedMembers = new HashSet<>();
+
     // Guards against listener re-entrancy while we update fields programmatically
     private boolean updatingProgrammatically = false;
 
@@ -99,12 +102,14 @@ public class SplitReviewActivity extends AppCompatActivity {
         binding.chipEqualSplit.setOnCheckedChangeListener((b, checked) -> {
             if (checked && splitType != SPLIT_EQUAL) {
                 splitType = SPLIT_EQUAL;
+                manuallyEditedMembers.clear();
                 rebuildMemberRows();
             }
         });
         binding.chipCustomSplit.setOnCheckedChangeListener((b, checked) -> {
             if (checked && splitType != SPLIT_CUSTOM) {
                 splitType = SPLIT_CUSTOM;
+                manuallyEditedMembers.clear();
                 rebuildMemberRows();
             }
         });
@@ -156,6 +161,7 @@ public class SplitReviewActivity extends AppCompatActivity {
             chip.setOnCheckedChangeListener((b, checked) -> {
                 if (checked) {
                     selectedGroup = group;
+                    manuallyEditedMembers.clear();
                     rebuildMemberRows();
                     binding.btnSplitConfirm.setEnabled(true);
                 }
@@ -251,18 +257,27 @@ public class SplitReviewActivity extends AppCompatActivity {
             cb.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 if (updatingProgrammatically) return;
                 if (!isChecked) {
-                    // Exclude: zero out this member and redistribute
+                    // Exclude: zero out, remove lock, redistribute remaining among others
+                    manuallyEditedMembers.remove(memberId);
                     updatingProgrammatically = true;
                     etAmount.setText("0");
                     etAmount.setEnabled(false);
                     etAmount.setAlpha(0.3f);
                     updatingProgrammatically = false;
-                    redistributeEquallyAmongChecked();
+                    redistributeRemainingAmongFree(memberId);
                 } else {
-                    // Re-include: redistribute equally (this member gets a share too)
+                    // Re-include: remove lock so this member is "free" again
+                    manuallyEditedMembers.remove(memberId);
                     etAmount.setEnabled(splitType == SPLIT_CUSTOM);
                     etAmount.setAlpha(splitType == SPLIT_EQUAL ? 0.6f : 1f);
-                    redistributeEquallyAmongChecked();
+                    if (splitType == SPLIT_EQUAL) {
+                        // Equal mode: reset everyone equally (no locks)
+                        redistributeEquallyAmongChecked();
+                    } else {
+                        // Custom mode: keep other members' locked amounts,
+                        // spread remaining among free members (including this newly re-ticked one)
+                        redistributeRemainingAmongFree(-1);
+                    }
                 }
             });
 
@@ -272,8 +287,12 @@ public class SplitReviewActivity extends AppCompatActivity {
                 @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
                 @Override public void afterTextChanged(Editable s) {
                     if (updatingProgrammatically) return;
-                    // In custom mode, just update the running total warning — don't auto-adjust
-                    updateRunningTotal();
+                    if (splitType == SPLIT_CUSTOM) {
+                        // Mark this member as manually edited (locked)
+                        manuallyEditedMembers.add(memberId);
+                        // Auto-distribute remaining amount among non-edited checked members
+                        redistributeRemainingAmongFree(memberId);
+                    }
                 }
             });
         }
@@ -328,6 +347,58 @@ public class SplitReviewActivity extends AppCompatActivity {
             if (!e.getValue().isChecked()) {
                 EditText et = memberAmountInputs.get(e.getKey());
                 if (et != null) et.setText("0");
+            }
+        }
+
+        updatingProgrammatically = false;
+        updateRunningTotal();
+    }
+
+    /**
+     * After a member's amount is manually edited or a member is excluded/re-included:
+     * Sums all locked amounts (manually edited + excluded=0), then spreads
+     * the remainder equally among free (checked, not manually edited) members.
+     * The last free member absorbs any paise rounding difference.
+     *
+     * @param changedMemberId the member who just changed (locked; skip from free targets).
+     *                        Pass -1 when re-including a member (no extra lock needed).
+     */
+    private void redistributeRemainingAmongFree(long changedMemberId) {
+        updatingProgrammatically = true;
+
+        long lockedPaise = 0;
+        List<Long> freeIds = new ArrayList<>();
+
+        for (SplitwiseGroup.Member m : selectedGroup.getMembers()) {
+            long id = m.getId();
+            CheckBox cb = memberCheckboxes.get(id);
+            EditText et = memberAmountInputs.get(id);
+            if (cb == null || et == null) continue;
+
+            if (!cb.isChecked()) {
+                // Excluded — locked at 0
+            } else if (id == changedMemberId || manuallyEditedMembers.contains(id)) {
+                // Manually edited or just changed — locked at their current value
+                lockedPaise += Math.round(parseAmount(et.getText().toString()) * 100);
+            } else {
+                // Free — will receive the remaining amount
+                freeIds.add(id);
+            }
+        }
+
+        long totalPaise = Math.round(amount * 100);
+        long remainingPaise = Math.max(0, totalPaise - lockedPaise);
+
+        if (!freeIds.isEmpty()) {
+            long perFreePaise = remainingPaise / freeIds.size();
+            long remainderPaise = remainingPaise - perFreePaise * freeIds.size();
+
+            for (int i = 0; i < freeIds.size(); i++) {
+                EditText et = memberAmountInputs.get(freeIds.get(i));
+                if (et == null) continue;
+                long sharePaise = perFreePaise + (i == freeIds.size() - 1 ? remainderPaise : 0);
+                et.setText(String.format("%.2f", sharePaise / 100.0)
+                    .replaceAll("\.00$", ""));
             }
         }
 
