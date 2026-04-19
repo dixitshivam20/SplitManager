@@ -250,6 +250,12 @@ public class SplitwiseApiClient {
             shareCents[shareCents.length - 1] += (totalCents - assignedCents);
         }
 
+        // Check if current user (the payer) is already in the members list
+        boolean currentUserIncluded = false;
+        for (SplitwiseGroup.Member m : members) {
+            if (m.getId() == currentUserId) { currentUserIncluded = true; break; }
+        }
+
         JsonObject body = new JsonObject();
         body.addProperty("cost",          String.format("%.2f", totalAmount));
         body.addProperty("description",   safeDesc);
@@ -264,6 +270,17 @@ public class SplitwiseApiClient {
                 member.getId() == currentUserId
                     ? String.format("%.2f", totalAmount) : "0.00");
         }
+
+        // CRITICAL: Splitwise requires paid_shares to sum to cost.
+        // If current user (payer) was excluded from the split, they still
+        // must appear with paid_share = totalAmount and owed_share = 0.00.
+        if (!currentUserIncluded) {
+            int idx = members.size();
+            body.addProperty("users__" + idx + "__user_id",    currentUserId);
+            body.addProperty("users__" + idx + "__owed_share", "0.00");
+            body.addProperty("users__" + idx + "__paid_share", String.format("%.2f", totalAmount));
+        }
+
         return postExpense(body);
     }
 
