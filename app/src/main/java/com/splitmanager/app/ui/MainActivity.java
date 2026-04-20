@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.splitmanager.app.BuildConfig;
+import com.splitmanager.app.db.PaymentInboxDb;
 import com.splitmanager.app.R;
 import com.splitmanager.app.databinding.ActivityMainBinding;
 import com.splitmanager.app.service.PaymentService;
@@ -62,6 +63,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupUI() {
         binding.btnGrantSms.setOnClickListener(v -> requestSmsPermissions());
+        binding.btnInbox.setOnClickListener(v ->
+            startActivity(new Intent(this, InboxActivity.class)));
         binding.btnHistory.setOnClickListener(v ->
             startActivity(new Intent(this, HistoryActivity.class)));
         binding.btnGrantNotification.setOnClickListener(v -> openNotificationListenerSettings());
@@ -182,6 +185,23 @@ public class MainActivity extends AppCompatActivity {
             binding.tvApiStatus.setText("Splitwise not configured");
             binding.tvApiStatus.setTextColor(0xFFF57C00);
         }
+        // Update unread badge on inbox card
+        updateInboxBadge();
+    }
+
+    private void updateInboxBadge() {
+        new Thread(() -> {
+            int count = PaymentInboxDb.getInstance(this).unreadCount();
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (count > 0) {
+                    binding.tvInboxBadge.setText(count > 99 ? "99+" : String.valueOf(count));
+                    binding.tvInboxBadge.setVisibility(android.view.View.VISIBLE);
+                } else {
+                    binding.tvInboxBadge.setVisibility(android.view.View.GONE);
+                }
+            });
+        }).start();
     }
 
     @Override

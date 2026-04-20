@@ -15,6 +15,7 @@ import androidx.core.app.NotificationManagerCompat;
 import com.splitmanager.app.R;
 import com.splitmanager.app.ui.SplitReviewActivity;
 
+import com.splitmanager.app.db.PaymentInboxDb;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -152,6 +153,10 @@ public class PaymentService extends Service {
             }
 
             Log.d(TAG, "Processing new payment event");
+
+            // Save to inbox so user can split later from the Notifications tab
+            PaymentInboxDb.getInstance(getApplicationContext())
+                .insert(amount, merchant, method, source);
 
             int notifId = paymentNotifId.getAndIncrement();
 
