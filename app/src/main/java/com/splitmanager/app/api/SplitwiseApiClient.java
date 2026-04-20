@@ -22,7 +22,6 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import okhttp3.CertificatePinner;
 
 public class SplitwiseApiClient {
 
@@ -59,29 +58,6 @@ public class SplitwiseApiClient {
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false) // Prevent duplicate expense on retry
-            // Certificate pinning — pins the DigiCert intermediate CAs used by Splitwise
-            // (hosted on Cloudflare infrastructure). Pinning intermediates rather than the
-            // leaf cert means the pin survives normal leaf cert rotations. Multiple pins are
-            // provided as a backup set: OkHttp accepts the connection if ANY pin in the set
-            // matches ANY certificate in the chain.
-            //
-            // HOW TO VERIFY / UPDATE PINS:
-            //   openssl s_client -connect secure.splitwise.com:443 -showcerts 2>/dev/null \
-            //     | openssl x509 -pubkey -noout \
-            //     | openssl pkey -pubin -outform der \
-            //     | openssl dgst -sha256 -binary | base64
-            //
-            // If Splitwise migrates away from DigiCert/Cloudflare, update these pins and
-            // ship a new release before the old cert expires (check expiry with:
-            //   openssl s_client -connect secure.splitwise.com:443 2>/dev/null | openssl x509 -noout -dates)
-            .certificatePinner(new CertificatePinner.Builder()
-                // DigiCert SHA2 High Assurance Server CA (primary intermediate)
-                .add("secure.splitwise.com", "sha256/k2v657xBsOVe1PQRwOsHsw3bsGT2VzIqz5K+59sNQws=")
-                // DigiCert TLS RSA SHA256 2020 CA1 (secondary intermediate, Cloudflare)
-                .add("secure.splitwise.com", "sha256/RQeZkB42znUfsDIIFWIRiYEcKl7nHwNFwWCrnMMJbi0=")
-                // DigiCert Global Root CA (backup root — long-lived, rarely rotated)
-                .add("secure.splitwise.com", "sha256/r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=")
-                .build())
             .addInterceptor(chain -> {
                 // Reconstruct key string only for the header, then discard immediately
                 String bearer = "Bearer " + new String(apiKeyChars);
