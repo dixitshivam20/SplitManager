@@ -50,6 +50,12 @@ public class SplitReviewActivity extends AppCompatActivity {
     private int splitType = SPLIT_EQUAL;
     private ExecutorService executor;
 
+    // Inbox sync fields — set when activity is opened from InboxActivity.
+    // Used to cancel the system notification and update the inbox entry
+    // when the user splits or ignores the payment from within the app.
+    private long inboxEntryId = -1;
+    private int  inboxNotifId = -1;
+
     // Per-member UI state
     private final Map<Long, CheckBox> memberCheckboxes   = new HashMap<>();
     private final Map<Long, EditText> memberAmountInputs = new HashMap<>();
@@ -83,8 +89,8 @@ public class SplitReviewActivity extends AppCompatActivity {
         String source = getIntent().getStringExtra(PaymentService.EXTRA_SOURCE);
         // Inbox entry ID and notification ID — passed when opened from InboxActivity.
         // Used to delete the inbox entry and cancel the system notification on split/ignore.
-        long inboxEntryId  = getIntent().getLongExtra("inbox_entry_id", -1);
-        int  inboxNotifId  = getIntent().getIntExtra("inbox_notif_id", -1);
+        inboxEntryId = getIntent().getLongExtra("inbox_entry_id", -1);
+        inboxNotifId = getIntent().getIntExtra("inbox_notif_id", -1);
 
         binding.tvAmount.setText(String.format("\u20B9%.0f", amount));
         binding.tvMerchant.setText(merchant != null ? merchant : "Unknown");
