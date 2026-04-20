@@ -175,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
     /** Lightweight refresh — only updates status indicators, never re-registers listeners */
     private void refreshStatus() {
         updatePermissionStatus();
+        // Refresh API status label only
         boolean hasKey = false;
         try { hasKey = SecurePrefsHelper.hasApiKey(this); } catch (Exception ignored) {}
         if (hasKey) {
