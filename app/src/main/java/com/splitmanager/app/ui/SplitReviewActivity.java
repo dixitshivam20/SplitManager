@@ -399,7 +399,7 @@ public class SplitReviewActivity extends AppCompatActivity {
                 if (et == null) continue;
                 long sharePaise = perFreePaise + (i == freeIds.size() - 1 ? remainderPaise : 0);
                 et.setText(String.format("%.2f", sharePaise / 100.0)
-                    .replaceAll("\.00$", ""));
+                    .replaceAll("\\.00$", ""));
             }
         }
 
