@@ -13,6 +13,17 @@ import androidx.security.crypto.MasterKey;
  *
  * SECURITY: No plaintext fallback. If encryption fails, we throw — we never
  * silently downgrade to plain SharedPreferences.
+ *
+ * Design: no static instance field is cached. create() is called on every get()
+ * invocation. EncryptedSharedPreferences.create() is idempotent — Android caches
+ * the underlying encrypted file handle internally, so repeated calls are fast (μs).
+ * Avoiding a static cache eliminates three risks:
+ *   1. Stale instance after Keystore re-keying (OS upgrade / factory reset on
+ *      some devices) — a cached instance would silently fail all decryptions.
+ *   2. clearAll() not reflecting in a cached reference — callers reading from
+ *      the old cached object would see the cleared values only after a restart.
+ *   3. Long-lived static reference to application context that prevents GC of
+ *      any objects transitively held by the SharedPreferences implementation.
  */
 public class SecurePrefsHelper {
 
@@ -24,19 +35,18 @@ public class SecurePrefsHelper {
     public static final String KEY_DEFAULT_GROUP_ID  = "default_group_id";
     public static final String KEY_ONBOARDING_DONE   = "onboarding_done";
 
-    private static volatile SharedPreferences instance;
-
     /**
-     * Returns the encrypted prefs instance.
-     * @throws SecurityException if Keystore is unavailable — caller must handle.
+     * Returns a fresh EncryptedSharedPreferences instance backed by the
+     * Android Keystore. Always uses applicationContext — never retains Activity.
+     *
+     * EncryptedSharedPreferences.create() is idempotent: Android's implementation
+     * caches the underlying encrypted file handle, so this is fast after the first
+     * call and safe to invoke on every read/write without performance penalty.
+     *
+     * @throws SecurityException if the Keystore is unavailable — caller must handle.
      */
     public static SharedPreferences get(Context context) {
-        if (instance != null) return instance;
-        synchronized (SecurePrefsHelper.class) {
-            if (instance != null) return instance;
-            instance = create(context.getApplicationContext());
-        }
-        return instance;
+        return create(context.getApplicationContext());
     }
 
     private static SharedPreferences create(Context ctx) {
