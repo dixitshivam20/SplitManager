@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.splitmanager.app.api.SplitwiseApiClient;
+import com.splitmanager.app.util.NotificationHelper;
 import com.splitmanager.app.db.SplitHistoryDb;
 import com.splitmanager.app.databinding.ActivitySplitReviewBinding;
 import com.splitmanager.app.model.SplitwiseGroup;
@@ -80,6 +81,10 @@ public class SplitReviewActivity extends AppCompatActivity {
         merchant = getIntent().getStringExtra(PaymentService.EXTRA_MERCHANT);
         String method = getIntent().getStringExtra(PaymentService.EXTRA_METHOD);
         String source = getIntent().getStringExtra(PaymentService.EXTRA_SOURCE);
+        // Inbox entry ID and notification ID — passed when opened from InboxActivity.
+        // Used to delete the inbox entry and cancel the system notification on split/ignore.
+        long inboxEntryId  = getIntent().getLongExtra("inbox_entry_id", -1);
+        int  inboxNotifId  = getIntent().getIntExtra("inbox_notif_id", -1);
 
         binding.tvAmount.setText(String.format("\u20B9%.0f", amount));
         binding.tvMerchant.setText(merchant != null ? merchant : "Unknown");
@@ -98,7 +103,18 @@ public class SplitReviewActivity extends AppCompatActivity {
         loadGroups();
 
         binding.btnSplitConfirm.setOnClickListener(v -> confirmSplit());
-        binding.btnIgnore.setOnClickListener(v -> finish());
+        // Ignore button: close the screen.
+        // If opened from the inbox, also cancel the system notification and mark as read.
+        binding.btnIgnore.setOnClickListener(v -> {
+            if (inboxEntryId != -1) {
+                final long fId = inboxEntryId;
+                final int  fNid = inboxNotifId;
+                executor.submit(() ->
+                    NotificationHelper.cancelNotificationAndMarkRead(
+                        getApplicationContext(), fNid, fId));
+            }
+            finish();
+        });
 
         // Two chips: Equal Split and Custom Amounts
         binding.chipEqualSplit.setChecked(true);
@@ -501,6 +517,13 @@ public class SplitReviewActivity extends AppCompatActivity {
                             .insert(amount, description, selectedGroup.getName(),
                                     finalMembers.size(), sType, expenseId);
                     } catch (Exception ignored) {}
+
+                    // Split succeeded — remove from inbox and cancel system notification.
+                    // The entry has been handled; keeping it would confuse the user.
+                    if (inboxEntryId != -1) {
+                        NotificationHelper.cancelNotificationAndDelete(
+                            getApplicationContext(), inboxNotifId, inboxEntryId);
+                    }
                 }
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;

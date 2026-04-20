@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.splitmanager.app.R;
 import com.splitmanager.app.db.PaymentInboxDb;
 import com.splitmanager.app.service.PaymentService;
+import com.splitmanager.app.util.NotificationHelper;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -46,20 +47,26 @@ public class InboxActivity extends AppCompatActivity {
         tvEmpty = findViewById(R.id.tv_empty_inbox);
         rvInbox.setLayoutManager(new LinearLayoutManager(this));
 
+        // Mark all read — cancels no system notifications (user may still want to act on them),
+        // but clears the bell badge inside the app.
         findViewById(R.id.btn_mark_all_read).setOnClickListener(v -> {
             executor.submit(() -> {
                 PaymentInboxDb.getInstance(this).markAllRead();
+                // Refresh badge — all are now read so badge count drops to 0
+                NotificationHelper.refreshBadge(getApplicationContext());
                 runOnUiThread(this::loadInbox);
             });
         });
 
+        // Clear all — cancels ALL system notifications and removes all inbox entries
         findViewById(R.id.btn_clear_inbox).setOnClickListener(v ->
             new AlertDialog.Builder(this)
                 .setTitle("Clear inbox?")
-                .setMessage("This removes all payment notifications from the inbox.")
+                .setMessage("This removes all payment notifications from the inbox and clears them from your notification drawer.")
                 .setPositiveButton("Clear", (d, w) -> {
                     executor.submit(() -> {
-                        PaymentInboxDb.getInstance(this).deleteAll();
+                        // Cancel all system notifications + clear DB + refresh badge
+                        NotificationHelper.cancelAllNotificationsAndClearInbox(getApplicationContext());
                         runOnUiThread(this::loadInbox);
                     });
                 })
@@ -103,7 +110,7 @@ public class InboxActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (executor != null) executor.shutdown();
+        if (executor != null) { executor.shutdown(); executor = null; }
     }
 
     // ── Adapter ───────────────────────────────────────────────────────────────
@@ -155,32 +162,45 @@ public class InboxActivity extends AppCompatActivity {
                 h.itemView.setBackgroundColor(0xFFFFFFFF);
             }
 
-            // Tap → mark read + open split screen
+            // Tap → cancel system notification + mark read + open split screen
             h.itemView.setOnClickListener(v -> {
-                // Mark read in DB
-                executor.submit(() -> {
-                    PaymentInboxDb.getInstance(InboxActivity.this).markRead(e.id);
-                });
+                // Cancel the system notification for this entry so the drawer stays clean
+                final int notifId = e.notifId;
+                final long inboxId = e.id;
+                executor.submit(() ->
+                    NotificationHelper.cancelNotificationAndMarkRead(
+                        getApplicationContext(), notifId, inboxId));
+
+                // Optimistically update the UI immediately (don't wait for DB)
                 e.read = true;
                 notifyItemChanged(pos);
 
                 // Open SplitReviewActivity with this payment
+                // Pass the inbox entry ID so SplitReviewActivity can delete it on success
                 Intent intent = new Intent(InboxActivity.this, SplitReviewActivity.class);
                 intent.putExtra(PaymentService.EXTRA_AMOUNT,   e.amount);
                 intent.putExtra(PaymentService.EXTRA_MERCHANT, e.merchant);
                 intent.putExtra(PaymentService.EXTRA_METHOD,   e.method);
                 intent.putExtra(PaymentService.EXTRA_SOURCE,   e.source);
+                // Pass inbox entry ID so SplitReviewActivity can delete it from inbox on success
+                intent.putExtra("inbox_entry_id", e.id);
+                // Pass notifId so SplitReviewActivity doesn't need to re-query it
+                intent.putExtra("inbox_notif_id", e.notifId);
                 startActivity(intent);
             });
 
-            // Long press → delete
+            // Long press → cancel system notification + delete from inbox entirely
             h.itemView.setOnLongClickListener(v -> {
                 new AlertDialog.Builder(InboxActivity.this)
                     .setTitle("Remove from inbox?")
-                    .setMessage("This only removes it from your inbox, not from Splitwise.")
+                    .setMessage("This removes it from your inbox and clears the notification from your drawer.")
                     .setPositiveButton("Remove", (d, w) -> {
+                        final int notifId = e.notifId;
+                        final long inboxId = e.id;
+                        // Cancel notification + delete from DB + refresh badge
                         executor.submit(() ->
-                            PaymentInboxDb.getInstance(InboxActivity.this).delete(e.id));
+                            NotificationHelper.cancelNotificationAndDelete(
+                                getApplicationContext(), notifId, inboxId));
                         items.remove(pos);
                         notifyItemRemoved(pos);
                         if (items.isEmpty()) {
