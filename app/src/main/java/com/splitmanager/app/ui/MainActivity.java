@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.splitmanager.app.BuildConfig;
+import com.splitmanager.app.util.NotificationHelper;
 import com.splitmanager.app.db.PaymentInboxDb;
 import com.splitmanager.app.R;
 import com.splitmanager.app.databinding.ActivityMainBinding;
@@ -175,7 +176,6 @@ public class MainActivity extends AppCompatActivity {
     /** Lightweight refresh — only updates status indicators, never re-registers listeners */
     private void refreshStatus() {
         updatePermissionStatus();
-        // Refresh API status label only
         boolean hasKey = false;
         try { hasKey = SecurePrefsHelper.hasApiKey(this); } catch (Exception ignored) {}
         if (hasKey) {
@@ -192,8 +192,11 @@ public class MainActivity extends AppCompatActivity {
     private void updateInboxBadge() {
         new Thread(() -> {
             int count = PaymentInboxDb.getInstance(this).unreadCount();
+            // Sync the system-level badge (app icon) with the same count
+            NotificationHelper.refreshBadge(getApplicationContext());
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
+                // Update the in-app bell badge on the home screen header
                 if (count > 0) {
                     binding.tvInboxBadge.setText(count > 99 ? "99+" : String.valueOf(count));
                     binding.tvInboxBadge.setVisibility(android.view.View.VISIBLE);

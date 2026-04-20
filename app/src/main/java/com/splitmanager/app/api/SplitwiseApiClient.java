@@ -82,7 +82,6 @@ public class SplitwiseApiClient {
         return clean.length() > maxLen ? clean.substring(0, maxLen) : clean;
     }
 
-    /** Safely get a string from JsonObject — returns fallback if null or JsonNull */
     private static String safeString(JsonObject obj, String key, String fallback) {
         if (obj == null || !obj.has(key) || obj.get(key).isJsonNull()) return fallback;
         try { return obj.get(key).getAsString(); }
@@ -137,7 +136,6 @@ public class SplitwiseApiClient {
         }
     }
 
-    /** Backwards-compatible boolean version */
     public boolean authenticate() {
         return authenticateWithReason() == null;
     }
@@ -168,11 +166,9 @@ public class SplitwiseApiClient {
                 if (!elem.isJsonObject()) continue;
                 JsonObject g = elem.getAsJsonObject();
 
-                // FIX: null-check id before using
                 if (!g.has("id") || g.get("id").isJsonNull()) continue;
                 if (g.get("id").getAsInt() == 0) continue;
 
-                // FIX: null-safe group name
                 String groupName = safeString(g, "name", "Unnamed Group");
 
                 SplitwiseGroup group = new SplitwiseGroup();
@@ -186,13 +182,10 @@ public class SplitwiseApiClient {
                         if (!mElem.isJsonObject()) continue;
                         JsonObject m = mElem.getAsJsonObject();
 
-                        // FIX: null-check member id
                         if (!m.has("id") || m.get("id").isJsonNull()) continue;
 
                         SplitwiseGroup.Member member = new SplitwiseGroup.Member();
                         member.setId(m.get("id").getAsLong());
-
-                        // FIX: null-safe first_name — fallback to "Member"
                         member.setFirstName(sanitize(safeString(m, "first_name", "Member"), 50));
 
                         if (m.has("last_name") && !m.get("last_name").isJsonNull())
@@ -221,8 +214,6 @@ public class SplitwiseApiClient {
         String safeDesc = sanitize(description, MAX_DESCRIPTION_LENGTH);
         if (safeDesc.isEmpty()) safeDesc = "Expense";
 
-        // Use integer cents to avoid floating point rounding errors
-        // Splitwise rejects splits where owed_shares don't sum exactly to cost
         long totalCents = Math.round(totalAmount * 100);
         long[] shareCents = new long[shares.size()];
         long assignedCents = 0;
@@ -230,12 +221,10 @@ public class SplitwiseApiClient {
             shareCents[i] = Math.round(shares.get(i) * 100);
             assignedCents += shareCents[i];
         }
-        // Absorb any rounding difference into the last member's share
         if (assignedCents != totalCents) {
             shareCents[shareCents.length - 1] += (totalCents - assignedCents);
         }
 
-        // Check if current user (the payer) is already in the members list
         boolean currentUserIncluded = false;
         for (SplitwiseGroup.Member m : members) {
             if (m.getId() == currentUserId) { currentUserIncluded = true; break; }
@@ -247,7 +236,6 @@ public class SplitwiseApiClient {
         body.addProperty("group_id",      groupId);
         body.addProperty("currency_code", "INR");
 
-        // Build user entries from the included members list
         for (int i = 0; i < members.size(); i++) {
             SplitwiseGroup.Member member = members.get(i);
             body.addProperty("users__" + i + "__user_id",    member.getId());
@@ -257,13 +245,8 @@ public class SplitwiseApiClient {
                     ? String.format("%.2f", totalAmount) : "0.00");
         }
 
-        // CRITICAL: Splitwise requires paid_shares to sum to cost.
-        // If the current user (payer) was excluded from the split (owed_share = 0),
-        // they still must appear with paid_share = totalAmount and owed_share = 0.00.
-        // Without this, all paid_shares = 0 and Splitwise rejects with:
-        // "The total of everyone's paid shares (₹0.00) is different than the total cost"
         if (!currentUserIncluded) {
-            int idx = members.size(); // next slot
+            int idx = members.size();
             body.addProperty("users__" + idx + "__user_id",    currentUserId);
             body.addProperty("users__" + idx + "__owed_share", "0.00");
             body.addProperty("users__" + idx + "__paid_share", String.format("%.2f", totalAmount));
@@ -295,24 +278,20 @@ public class SplitwiseApiClient {
             JsonObject respJson = gson.fromJson(respBody, JsonObject.class);
             if (respJson == null) throw new IOException("Could not parse Splitwise response");
 
-            // Check for API-level errors (HTTP 200 but Splitwise rejected the data)
-            // e.g. {"errors":{"base":["Owed shares do not add up to cost"]}}
             if (respJson.has("errors")) {
                 JsonObject errors = respJson.getAsJsonObject("errors");
                 if (errors != null && errors.size() > 0) {
-                    // Extract first error message for a meaningful exception
                     String errMsg = "Splitwise rejected the split";
                     try {
                         JsonElement base = errors.get("base");
                         if (base != null && base.isJsonArray() && base.getAsJsonArray().size() > 0)
                             errMsg = base.getAsJsonArray().get(0).getAsString();
                     } catch (Exception ignored) {}
-                    Log.e(TAG, "Splitwise API error: " + errMsg);
+                    Log.e(TAG, "Splitwise API error");
                     throw new IOException(errMsg);
                 }
             }
 
-            // Extract expense ID from response
             JsonArray expenses = respJson.getAsJsonArray("expenses");
             if (expenses != null && expenses.size() > 0) {
                 JsonObject exp = expenses.get(0).getAsJsonObject();
@@ -321,9 +300,7 @@ public class SplitwiseApiClient {
                 }
             }
 
-            // HTTP 200 with no errors and no ID — treat as success
-            // (Splitwise occasionally returns expenses:[] for valid splits)
-            Log.d(TAG, "Expense created — no ID returned by Splitwise (treated as success)");
+            Log.d(TAG, "Expense created — no ID returned (treated as success)");
             return "created";
 
         } finally {

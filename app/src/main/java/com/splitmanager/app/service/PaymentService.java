@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
 import com.splitmanager.app.R;
+import com.splitmanager.app.util.NotificationHelper;
 import com.splitmanager.app.ui.SplitReviewActivity;
 
 import com.splitmanager.app.db.PaymentInboxDb;
@@ -47,7 +48,7 @@ public class PaymentService extends Service {
     private static volatile String currentToken = null;
 
     /** Package-accessible getter — SmsReceiver and NotificationListener read this */
-    public static String getCurrentToken() { return currentToken; }
+    static String getCurrentToken() { return currentToken; }
 
     // Dedup cache: key = "amount:reference", value = timestamp of last seen
     // Prevents duplicate notifications when both SMS + notification listener fire for the same payment
@@ -74,11 +75,27 @@ public class PaymentService extends Service {
         if (intent == null) return START_STICKY;
         String action = intent.getAction();
 
-        // Handle ignore button — cancel the specific notification and return
+        // Handle ignore button — cancel the system notification and mark the
+        // matching inbox entry as read so the bell badge stays in sync.
         if (action != null && action.startsWith("IGNORE_")) {
             try {
                 int notifId = Integer.parseInt(action.replace("IGNORE_", ""));
+                // Cancel the system notification
                 NotificationManagerCompat.from(this).cancel(notifId);
+                // Mark the matching inbox entry as read (keeps in-app inbox in sync)
+                // We run this on the executor to avoid StrictMode disk-on-main-thread
+                if (executor != null) {
+                    final int fNotifId = notifId;
+                    executor.submit(() -> {
+                        try {
+                            com.splitmanager.app.db.PaymentInboxDb db =
+                                com.splitmanager.app.db.PaymentInboxDb.getInstance(getApplicationContext());
+                            db.markReadByNotifId(fNotifId);
+                        } catch (Exception ex) {
+                            Log.w(TAG, "Could not sync inbox on ignore");
+                        }
+                    });
+                }
                 Log.d(TAG, "Payment notification dismissed by user");
             } catch (Exception e) {
                 Log.w(TAG, "Could not dismiss notification");
@@ -154,11 +171,13 @@ public class PaymentService extends Service {
 
             Log.d(TAG, "Processing new payment event");
 
-            // Save to inbox so user can split later from the Notifications tab
-            PaymentInboxDb.getInstance(getApplicationContext())
-                .insert(amount, merchant, method, source);
-
             int notifId = paymentNotifId.getAndIncrement();
+
+            // Save to inbox so user can split later from the Notifications tab.
+            // We store notifId alongside the entry so InboxActivity can cancel
+            // the system notification when the user acts on the inbox entry.
+            PaymentInboxDb.getInstance(getApplicationContext())
+                .insert(amount, merchant, method, source, notifId);
 
             Intent reviewIntent = new Intent(this, SplitReviewActivity.class);
             reviewIntent.putExtra(EXTRA_AMOUNT,   amount);
@@ -197,10 +216,14 @@ public class PaymentService extends Service {
                 .setCategory(NotificationCompat.CATEGORY_EVENT)
                 .setVibrate(new long[]{0, 250, 100, 250})
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                // Group key enables the summary notification to carry the badge count
+                .setGroup(NotificationHelper.GROUP_PAYMENTS)
                 .build();
 
             try {
                 NotificationManagerCompat.from(this).notify(notifId, notif);
+                // Update app icon badge to reflect new unread count
+                NotificationHelper.refreshBadge(getApplicationContext());
             } catch (SecurityException e) {
                 // POST_NOTIFICATIONS permission not granted — user hasn't approved yet
                 Log.w(TAG, "Cannot post notification — POST_NOTIFICATIONS not granted");
