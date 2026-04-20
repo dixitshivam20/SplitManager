@@ -47,7 +47,7 @@ public class PaymentService extends Service {
     private static volatile String currentToken = null;
 
     /** Package-accessible getter — SmsReceiver and NotificationListener read this */
-    static String getCurrentToken() { return currentToken; }
+    public static String getCurrentToken() { return currentToken; }
 
     // Dedup cache: key = "amount:reference", value = timestamp of last seen
     // Prevents duplicate notifications when both SMS + notification listener fire for the same payment
