@@ -108,6 +108,11 @@ public class PaymentService extends Service {
                         } catch (Exception ex) {
                             Log.w(TAG, "Could not sync inbox on ignore");
                         }
+                        // Refresh the summary/badge notification directly — this cancels the
+                        // persistent "N payments to split" summary if unread count drops to 0.
+                        // The LocalBroadcast below also triggers MainActivity if it is visible,
+                        // but refreshBadge() here handles the case where the app is closed.
+                        com.splitmanager.app.util.NotificationHelper.refreshBadge(getApplicationContext());
                         // Broadcast badge update so MainActivity refreshes the bell
                         // counter immediately, even while it is in the background.
                         LocalBroadcastManager.getInstance(getApplicationContext())
@@ -195,7 +200,10 @@ public class PaymentService extends Service {
             // Save to inbox so user can split later from the Notifications tab.
             // We store notifId alongside the entry so InboxActivity can cancel
             // the system notification when the user acts on the inbox entry.
-            PaymentInboxDb.getInstance(getApplicationContext())
+            // FIX: capture the returned row ID so we can pass it to SplitReviewActivity
+            // via the notification PendingIntent — without it, the activity cannot update
+            // the inbox entry status (added/ignored) when opened from a notification tap.
+            long inboxRowId = PaymentInboxDb.getInstance(getApplicationContext())
                 .insert(amount, merchant, method, source, notifId);
 
             Intent reviewIntent = new Intent(this, SplitReviewActivity.class);
@@ -203,6 +211,10 @@ public class PaymentService extends Service {
             reviewIntent.putExtra(EXTRA_MERCHANT, merchant);
             reviewIntent.putExtra(EXTRA_METHOD,   method);
             reviewIntent.putExtra(EXTRA_SOURCE,   source);
+            // Pass inbox entry ID and notifId so SplitReviewActivity can mark the entry
+            // as read/added/ignored even when opened directly from the notification panel.
+            reviewIntent.putExtra("inbox_entry_id", inboxRowId);
+            reviewIntent.putExtra("inbox_notif_id", notifId);
             reviewIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
             PendingIntent pendingIntent = PendingIntent.getActivity(
