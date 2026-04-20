@@ -93,7 +93,7 @@ public class PaymentNotificationListener extends NotificationListenerService {
         serviceIntent.putExtra(PaymentService.EXTRA_MERCHANT, event.getMerchant());
         serviceIntent.putExtra(PaymentService.EXTRA_METHOD,   event.getMethod().name());
         serviceIntent.putExtra(PaymentService.EXTRA_SOURCE,   event.getSource());
-        serviceIntent.putExtra(PaymentService.EXTRA_SESSION_TOKEN, PaymentService.currentToken);
+        serviceIntent.putExtra(PaymentService.EXTRA_SESSION_TOKEN, PaymentService.getCurrentToken());
         try {
             startForegroundService(serviceIntent);
         } catch (Exception e) {

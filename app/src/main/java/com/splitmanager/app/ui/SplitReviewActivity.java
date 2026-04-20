@@ -553,5 +553,7 @@ public class SplitReviewActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (executor != null) { executor.shutdown(); executor = null; }
+        // Zero out API key char[] from memory
+        if (apiClient != null) apiClient.destroy();
     }
 }

@@ -76,6 +76,7 @@ public class SetupActivity extends AppCompatActivity {
         executor.submit(() -> {
             SplitwiseApiClient client = new SplitwiseApiClient(key);
             String errorReason = client.authenticateWithReason();
+            client.destroy(); // Zero out key chars immediately after auth check
 
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;

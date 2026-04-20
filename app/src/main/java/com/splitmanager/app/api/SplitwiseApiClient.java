@@ -10,6 +10,7 @@ import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -31,29 +32,48 @@ public class SplitwiseApiClient {
 
     private final OkHttpClient httpClient;
     private final Gson gson;
-    private final String apiKey;
+
+    // API key stored as char[] instead of String.
+    // Strings are immutable and stay in the heap/string pool until GC.
+    // char[] can be explicitly zeroed after use, minimising the window
+    // during which a heap dump could expose the key.
+    private final char[] apiKeyChars;
+
     private long currentUserId = -1;
 
     public SplitwiseApiClient(String apiKey) {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalArgumentException("API key must not be empty");
         }
-        this.apiKey = apiKey;
+        // Store as char[] — never kept as a String field
+        this.apiKeyChars = apiKey.toCharArray();
+
         this.httpClient = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(false)
+            .retryOnConnectionFailure(false) // Prevent duplicate expense on retry
             .addInterceptor(chain -> {
+                // Reconstruct key string only for the header, then discard immediately
+                String bearer = "Bearer " + new String(apiKeyChars);
                 Request req = chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer " + apiKey)
+                    .addHeader("Authorization", bearer)
                     .addHeader("Accept", "application/json")
                     .addHeader("Content-Type", "application/json")
                     .build();
+                // bearer is now eligible for GC — we hold no reference to it
                 return chain.proceed(req);
             })
             .build();
         this.gson = new Gson();
+    }
+
+    /**
+     * Zero out the key material when this client is no longer needed.
+     * Call this when the activity/service that owns the client is destroyed.
+     */
+    public void destroy() {
+        Arrays.fill(apiKeyChars, '\0');
     }
 
     private static String sanitize(String input, int maxLen) {
@@ -189,41 +209,6 @@ public class SplitwiseApiClient {
         } finally {
             if (resp != null) resp.close();
         }
-    }
-
-    public String createEqualSplit(long groupId, double totalAmount, String description,
-                                    List<SplitwiseGroup.Member> members) throws IOException {
-        if (currentUserId < 0) throw new IOException("Not authenticated");
-        validateAmount(totalAmount);
-
-        int memberCount = members.size();
-        if (memberCount == 0) throw new IOException("No members in group");
-        if (memberCount > 50) throw new IOException("Too many members");
-
-        String safeDesc = sanitize(description, MAX_DESCRIPTION_LENGTH);
-        if (safeDesc.isEmpty()) safeDesc = "Expense";
-
-        long totalCents = Math.round(totalAmount * 100);
-        long perPerson  = totalCents / memberCount;
-        long remainder  = totalCents - (perPerson * memberCount);
-
-        JsonObject body = new JsonObject();
-        body.addProperty("cost",          String.format("%.2f", totalAmount));
-        body.addProperty("description",   safeDesc);
-        body.addProperty("group_id",      groupId);
-        body.addProperty("split_equally", true);
-        body.addProperty("currency_code", "INR");
-
-        for (int i = 0; i < members.size(); i++) {
-            SplitwiseGroup.Member member = members.get(i);
-            long share = perPerson + (i == 0 ? remainder : 0);
-            body.addProperty("users__" + i + "__user_id",    member.getId());
-            body.addProperty("users__" + i + "__owed_share", String.format("%.2f", share / 100.0));
-            body.addProperty("users__" + i + "__paid_share",
-                member.getId() == currentUserId
-                    ? String.format("%.2f", totalAmount) : "0.00");
-        }
-        return postExpense(body);
     }
 
     public String createCustomSplit(long groupId, double totalAmount, String description,

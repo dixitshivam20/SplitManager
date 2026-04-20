@@ -39,14 +39,14 @@ public class PaymentService extends Service {
     private static final int    FG_NOTIF_ID        = 1;
     private static final double MAX_VALID_AMOUNT   = 1_000_000.0;
 
-    // Package-private session token — renewed each service lifecycle
-    // Internal components (SmsReceiver, NotificationListener) read this
-    // Package-private — internal components in same package access directly
-    // UI package accesses via getCurrentToken() getter
-    static volatile String currentToken = null;
+    // Private session token — renewed each service lifecycle.
+    // Only accessible via getCurrentToken() getter — not directly writable
+    // by any class outside PaymentService, preventing accidental or malicious
+    // token overwrite from other classes in the same package.
+    private static volatile String currentToken = null;
 
-    /** Public getter so UI layer can read token without exposing the field */
-    public static String getCurrentToken() { return currentToken; }
+    /** Package-accessible getter — SmsReceiver and NotificationListener read this */
+    static String getCurrentToken() { return currentToken; }
 
     // Dedup cache: key = "amount:reference", value = timestamp of last seen
     // Prevents duplicate notifications when both SMS + notification listener fire for the same payment
@@ -130,8 +130,15 @@ public class PaymentService extends Service {
         executor.submit(() -> {
             // Deduplication: SMS and notification listener can both fire for the same payment.
             // If we've seen the same amount+reference within 10 seconds, skip it.
+            // Dedup key: amount is always included.
+            // If reference ID exists (UPI Ref, IMPS Ref) use it — it's globally unique.
+            // Otherwise fall back to amount:merchant. The 10s window handles the rest.
             String dedupKey = String.format("%.2f:%s", amount,
-                (reference != null && !reference.isEmpty()) ? reference : merchant);
+                (reference != null && !reference.isEmpty())
+                    ? reference
+                    : (merchant != null && !merchant.isEmpty() && !merchant.equals("Unknown Merchant"))
+                        ? merchant
+                        : String.valueOf(Math.round(amount)));  // amount-only fallback
             long now = System.currentTimeMillis();
             synchronized (recentPayments) {
                 Long lastSeen = recentPayments.get(dedupKey);
