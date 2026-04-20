@@ -81,7 +81,7 @@ public class SmsReceiver extends BroadcastReceiver {
         serviceIntent.putExtra(PaymentService.EXTRA_METHOD,        event.getMethod().name());
         serviceIntent.putExtra(PaymentService.EXTRA_REFERENCE,     event.getReferenceId());
         serviceIntent.putExtra(PaymentService.EXTRA_SOURCE,        "SMS");
-        serviceIntent.putExtra(PaymentService.EXTRA_SESSION_TOKEN, PaymentService.currentToken);
+        serviceIntent.putExtra(PaymentService.EXTRA_SESSION_TOKEN, PaymentService.getCurrentToken());
 
         try {
             context.startForegroundService(serviceIntent);

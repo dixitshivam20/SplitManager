@@ -26,10 +26,8 @@ import com.google.android.material.chip.Chip;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -553,5 +551,7 @@ public class SplitReviewActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (executor != null) { executor.shutdown(); executor = null; }
+        // Zero out API key char[] from memory
+        if (apiClient != null) apiClient.destroy();
     }
 }
