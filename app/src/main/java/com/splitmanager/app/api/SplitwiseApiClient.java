@@ -14,8 +14,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import okio.ByteString;
-
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -95,10 +93,14 @@ public class SplitwiseApiClient {
         if (contentLength > MAX_RESPONSE_BYTES) {
             throw new IOException("Response body too large (" + contentLength + " bytes)");
         }
-        // Read up to MAX_RESPONSE_BYTES+1 bytes; if we get more, reject
+        // FIX: source.request(n) loops internally until n bytes are buffered OR EOF is
+        // reached — whichever comes first. This is critical for multi-packet HTTP responses
+        // (e.g. /get_groups with many members spans multiple TCP segments).
+        // The previous source.read(buffer, n) only read ONE Okio segment (~8KB) and
+        // returned, leaving the rest of the body unread and truncating the JSON.
         okio.BufferedSource source = rb.source();
-        okio.Buffer buffer = new okio.Buffer();
-        source.read(buffer, MAX_RESPONSE_BYTES + 1);
+        source.request(MAX_RESPONSE_BYTES + 1); // buffer full body up to cap+1
+        okio.Buffer buffer = source.getBuffer();
         if (buffer.size() > MAX_RESPONSE_BYTES) {
             throw new IOException("Response body exceeds size limit");
         }
@@ -320,6 +322,23 @@ public class SplitwiseApiClient {
 
             if (!resp.isSuccessful()) {
                 Log.e(TAG, "Create expense failed: HTTP " + resp.code());
+                // Try to extract Splitwise's own error message from the body before
+                // throwing — gives the user a more actionable reason than just the HTTP code.
+                // e.g. 422 often includes {"errors":{"base":["Owed shares do not add up"]}}
+                try {
+                    JsonObject errJson = gson.fromJson(respBody, JsonObject.class);
+                    if (errJson != null && errJson.has("errors")) {
+                        JsonObject errs = errJson.getAsJsonObject("errors");
+                        if (errs != null && errs.has("base")) {
+                            JsonElement base = errs.get("base");
+                            if (base.isJsonArray() && base.getAsJsonArray().size() > 0) {
+                                throw new IOException(base.getAsJsonArray().get(0).getAsString());
+                            }
+                        }
+                    }
+                } catch (IOException rethrow) {
+                    throw rethrow; // rethrow the extracted Splitwise error
+                } catch (Exception ignored) {} // JSON parse failed — fall through to generic
                 throw new IOException("Failed to create expense: HTTP " + resp.code());
             }
 
