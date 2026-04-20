@@ -26,9 +26,14 @@ public class PaymentInboxDb extends SQLiteOpenHelper {
 
     private static final String TAG     = "PaymentInboxDb";
     private static final String DB_NAME = "payment_inbox.db";
-    // Version bumped to 2 — adds notif_id column for notification sync
-    private static final int    DB_VER  = 2;
+    // Version bumped to 3 — adds status column for ignored/added labels
+    private static final int    DB_VER  = 3;
     private static final String TABLE   = "inbox";
+
+    // Status values stored in the 'status' column
+    public static final String STATUS_PENDING  = "pending";   // awaiting user action
+    public static final String STATUS_ADDED    = "added";     // split was created in Splitwise
+    public static final String STATUS_IGNORED  = "ignored";   // user dismissed without splitting
 
     private static volatile PaymentInboxDb INSTANCE;
 
@@ -44,6 +49,26 @@ public class PaymentInboxDb extends SQLiteOpenHelper {
 
     private PaymentInboxDb(Context ctx) { super(ctx, DB_NAME, null, DB_VER); }
 
+    /**
+     * Enable Write-Ahead Logging (WAL) mode.
+     *
+     * Without WAL, SQLite uses a rollback journal which exclusively locks the database
+     * file during writes. Because PaymentService, InboxActivity, and SplitReviewActivity
+     * all access this DB from separate executor threads, a write on one thread blocks all
+     * readers, and concurrent access can throw SQLiteDatabaseLockedException at runtime.
+     *
+     * WAL mode allows concurrent reads to proceed alongside a single writer, eliminating
+     * the lock contention without requiring any changes to existing query code.
+     *
+     * onConfigure() is called before onCreate/onUpgrade, making it the correct place for
+     * connection-level settings like WAL.
+     */
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.enableWriteAheadLogging();
+    }
+
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE " + TABLE + " (" +
@@ -54,7 +79,8 @@ public class PaymentInboxDb extends SQLiteOpenHelper {
             "source TEXT," +
             "timestamp INTEGER NOT NULL," +
             "read INTEGER NOT NULL DEFAULT 0," +  // 0=unread, 1=read
-            "notif_id INTEGER NOT NULL DEFAULT -1" + // Android notification ID — -1 if not applicable
+            "notif_id INTEGER NOT NULL DEFAULT -1," + // Android notification ID — -1 if not applicable
+            "status TEXT NOT NULL DEFAULT 'pending'" + // pending / added / ignored
         ")");
     }
 
@@ -68,6 +94,15 @@ public class PaymentInboxDb extends SQLiteOpenHelper {
                 // If ALTER fails (e.g. table doesn't exist yet), recreate cleanly
                 db.execSQL("DROP TABLE IF EXISTS " + TABLE);
                 onCreate(db);
+            }
+        }
+        if (oldV < 3) {
+            // Add status column for ignored/added labels on inbox entries
+            try {
+                db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
+            } catch (Exception e) {
+                // Column may already exist if table was just recreated above
+                Log.w(TAG, "Could not add status column (may already exist)");
             }
         }
     }
@@ -130,6 +165,43 @@ public class PaymentInboxDb extends SQLiteOpenHelper {
             getWritableDatabase().update(TABLE, cv, null, null);
         } catch (Exception e) {
             Log.w(TAG, "Could not mark all as read");
+        }
+    }
+
+    /**
+     * Update the status label of a single entry.
+     * @param id     inbox entry ID
+     * @param status one of STATUS_PENDING / STATUS_ADDED / STATUS_IGNORED
+     */
+    public void updateStatus(long id, String status) {
+        if (id == -1) return;
+        try {
+            ContentValues cv = new ContentValues();
+            cv.put("status", status);
+            getWritableDatabase().update(TABLE, cv, "id=?", new String[]{String.valueOf(id)});
+        } catch (Exception e) {
+            Log.w(TAG, "Could not update status for inbox entry");
+        }
+    }
+
+    /**
+     * Update the status label of the entry matching a given Android notification ID.
+     * Called from PaymentService when the user acts on a system notification directly,
+     * so the in-app inbox shows the correct ignored/added label without a manual refresh.
+     *
+     * @param notifId Android notification ID
+     * @param status  one of STATUS_PENDING / STATUS_ADDED / STATUS_IGNORED
+     */
+    public void updateStatusByNotifId(int notifId, String status) {
+        if (notifId == -1) return;
+        try {
+            ContentValues cv = new ContentValues();
+            cv.put("status", status);
+            cv.put("read", 1); // acting on a notification always counts as read
+            getWritableDatabase().update(TABLE, cv, "notif_id=?",
+                new String[]{String.valueOf(notifId)});
+        } catch (Exception e) {
+            Log.w(TAG, "Could not update status by notifId");
         }
     }
 
@@ -254,6 +326,10 @@ public class PaymentInboxDb extends SQLiteOpenHelper {
                 e.timestamp = c.getLong(c.getColumnIndexOrThrow("timestamp"));
                 e.read      = c.getInt(c.getColumnIndexOrThrow("read")) == 1;
                 e.notifId   = c.getInt(c.getColumnIndexOrThrow("notif_id"));
+                // status defaults to "pending" for legacy rows that pre-date column addition
+                int statusIdx = c.getColumnIndex("status");
+                e.status    = (statusIdx != -1 && !c.isNull(statusIdx))
+                              ? c.getString(statusIdx) : STATUS_PENDING;
                 list.add(e);
             }
         } catch (Exception e) {
@@ -273,5 +349,6 @@ public class PaymentInboxDb extends SQLiteOpenHelper {
         public long    timestamp;
         public boolean read;
         public int     notifId; // Android notification ID — cancel this when entry is acted on
+        public String  status;  // pending / added / ignored — shown as a label in the inbox
     }
 }

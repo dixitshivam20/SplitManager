@@ -55,6 +55,18 @@ public class SplitHistoryDb extends SQLiteOpenHelper {
 
     private SplitHistoryDb(Context ctx) { super(ctx, DB_NAME, null, DB_VERSION); }
 
+    /**
+     * Enable Write-Ahead Logging (WAL) mode.
+     * See PaymentInboxDb.onConfigure() for full explanation.
+     * SplitHistoryDb is accessed from SplitReviewActivity's executor thread during
+     * split confirmation while HistoryActivity may be reading it — WAL prevents locking.
+     */
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.enableWriteAheadLogging();
+    }
+
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE " + TABLE + " (" +

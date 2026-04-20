@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
@@ -17,6 +18,7 @@ import com.splitmanager.app.R;
 import com.splitmanager.app.db.PaymentInboxDb;
 import com.splitmanager.app.service.PaymentService;
 import com.splitmanager.app.util.NotificationHelper;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -36,6 +38,11 @@ public class InboxActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_inbox);
+        // FLAG_SECURE: prevents screenshots and screen recording of this screen.
+        // The inbox displays payment amounts and merchant names — PII that should
+        // not appear in recent-apps thumbnails or be captured by screen recorders.
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE,
+                             WindowManager.LayoutParams.FLAG_SECURE);
         executor = Executors.newSingleThreadExecutor();
 
         if (getSupportActionBar() != null) {
@@ -54,6 +61,9 @@ public class InboxActivity extends AppCompatActivity {
                 PaymentInboxDb.getInstance(this).markAllRead();
                 // Refresh badge — all are now read so badge count drops to 0
                 NotificationHelper.refreshBadge(getApplicationContext());
+                // Notify MainActivity to refresh bell badge immediately
+                LocalBroadcastManager.getInstance(getApplicationContext())
+                    .sendBroadcast(new Intent(PaymentService.ACTION_BADGE_UPDATED));
                 runOnUiThread(this::loadInbox);
             });
         });
@@ -67,6 +77,9 @@ public class InboxActivity extends AppCompatActivity {
                     executor.submit(() -> {
                         // Cancel all system notifications + clear DB + refresh badge
                         NotificationHelper.cancelAllNotificationsAndClearInbox(getApplicationContext());
+                        // Notify MainActivity to refresh bell badge immediately
+                        LocalBroadcastManager.getInstance(getApplicationContext())
+                            .sendBroadcast(new Intent(PaymentService.ACTION_BADGE_UPDATED));
                         runOnUiThread(this::loadInbox);
                     });
                 })
@@ -141,6 +154,22 @@ public class InboxActivity extends AppCompatActivity {
                 (e.method != null && !e.method.isEmpty()
                     ? e.method.replace("_", " ") + " · " : "") +
                 SDF.format(new Date(e.timestamp)));
+
+            // Status pill — show "Added" or "Ignored" after merchant name, hide for pending
+            if (PaymentInboxDb.STATUS_ADDED.equals(e.status)) {
+                h.tvStatus.setText("Added");
+                h.tvStatus.setBackgroundResource(R.drawable.bg_badge);
+                h.tvStatus.getBackground().setTint(0xFF2E7D32); // green
+                h.tvStatus.setVisibility(android.view.View.VISIBLE);
+            } else if (PaymentInboxDb.STATUS_IGNORED.equals(e.status)) {
+                h.tvStatus.setText("Ignored");
+                h.tvStatus.setBackgroundResource(R.drawable.bg_badge);
+                h.tvStatus.getBackground().setTint(0xFF9E9E9E); // grey
+                h.tvStatus.setVisibility(android.view.View.VISIBLE);
+            } else {
+                // Pending — no pill shown
+                h.tvStatus.setVisibility(android.view.View.GONE);
+            }
 
             if (e.read) {
                 // Read — faded, normal weight
@@ -217,13 +246,14 @@ public class InboxActivity extends AppCompatActivity {
         @Override public int getItemCount() { return items.size(); }
 
         class VH extends RecyclerView.ViewHolder {
-            TextView tvAmount, tvMerchant, tvMeta, tvUnreadDot;
+            TextView tvAmount, tvMerchant, tvMeta, tvUnreadDot, tvStatus;
             VH(View v) {
                 super(v);
                 tvAmount    = v.findViewById(R.id.tv_inbox_amount);
                 tvMerchant  = v.findViewById(R.id.tv_inbox_merchant);
                 tvMeta      = v.findViewById(R.id.tv_inbox_meta);
                 tvUnreadDot = v.findViewById(R.id.tv_unread_dot);
+                tvStatus    = v.findViewById(R.id.tv_inbox_status);
             }
         }
     }
