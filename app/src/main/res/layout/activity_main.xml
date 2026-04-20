@@ -30,6 +30,14 @@
                 android:textColor="@color/text_primary"/>
 
             <Button
+                android:id="@+id/btn_history"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="Split History"
+                android:layout_marginBottom="10dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
                 android:id="@+id/btn_open_settings"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"

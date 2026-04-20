@@ -262,6 +262,7 @@ public class SplitwiseApiClient {
         body.addProperty("group_id",      groupId);
         body.addProperty("currency_code", "INR");
 
+        // Build user entries from the included members list
         for (int i = 0; i < members.size(); i++) {
             SplitwiseGroup.Member member = members.get(i);
             body.addProperty("users__" + i + "__user_id",    member.getId());
@@ -272,10 +273,12 @@ public class SplitwiseApiClient {
         }
 
         // CRITICAL: Splitwise requires paid_shares to sum to cost.
-        // If current user (payer) was excluded from the split, they still
-        // must appear with paid_share = totalAmount and owed_share = 0.00.
+        // If the current user (payer) was excluded from the split (owed_share = 0),
+        // they still must appear with paid_share = totalAmount and owed_share = 0.00.
+        // Without this, all paid_shares = 0 and Splitwise rejects with:
+        // "The total of everyone's paid shares (₹0.00) is different than the total cost"
         if (!currentUserIncluded) {
-            int idx = members.size();
+            int idx = members.size(); // next slot
             body.addProperty("users__" + idx + "__user_id",    currentUserId);
             body.addProperty("users__" + idx + "__owed_share", "0.00");
             body.addProperty("users__" + idx + "__paid_share", String.format("%.2f", totalAmount));

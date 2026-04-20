@@ -15,6 +15,8 @@ import androidx.core.app.NotificationManagerCompat;
 import com.splitmanager.app.R;
 import com.splitmanager.app.ui.SplitReviewActivity;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +47,11 @@ public class PaymentService extends Service {
 
     /** Public getter so UI layer can read token without exposing the field */
     public static String getCurrentToken() { return currentToken; }
+
+    // Dedup cache: key = "amount:reference", value = timestamp of last seen
+    // Prevents duplicate notifications when both SMS + notification listener fire for the same payment
+    private final Map<String, Long> recentPayments = new HashMap<>();
+    private static final long DEDUP_WINDOW_MS = 10_000; // 10 seconds
 
     private String sessionToken;
     private final AtomicInteger paymentNotifId = new AtomicInteger(100);
@@ -121,6 +128,22 @@ public class PaymentService extends Service {
     private void handlePayment(double amount, String merchant, String method,
                                 String reference, String source) {
         executor.submit(() -> {
+            // Deduplication: SMS and notification listener can both fire for the same payment.
+            // If we've seen the same amount+reference within 10 seconds, skip it.
+            String dedupKey = String.format("%.2f:%s", amount,
+                (reference != null && !reference.isEmpty()) ? reference : merchant);
+            long now = System.currentTimeMillis();
+            synchronized (recentPayments) {
+                Long lastSeen = recentPayments.get(dedupKey);
+                if (lastSeen != null && (now - lastSeen) < DEDUP_WINDOW_MS) {
+                    Log.d(TAG, "Duplicate payment detected, skipping notification");
+                    return;
+                }
+                // Evict old entries to prevent unbounded growth
+                recentPayments.entrySet().removeIf(e -> (now - e.getValue()) > DEDUP_WINDOW_MS * 6);
+                recentPayments.put(dedupKey, now);
+            }
+
             Log.d(TAG, "Processing new payment event");
 
             int notifId = paymentNotifId.getAndIncrement();
