@@ -123,6 +123,11 @@ public class SplitReviewActivity extends AppCompatActivity {
                             com.splitmanager.app.db.PaymentInboxDb.STATUS_IGNORED);
                     NotificationHelper.cancelNotificationAndMarkRead(
                         getApplicationContext(), fNid, fId);
+                    // Broadcast so MainActivity refreshes bell badge immediately
+                    androidx.localbroadcastmanager.content.LocalBroadcastManager
+                        .getInstance(getApplicationContext())
+                        .sendBroadcast(new android.content.Intent(
+                            com.splitmanager.app.service.PaymentService.ACTION_BADGE_UPDATED));
                 });
             }
             finish();
@@ -530,15 +535,24 @@ public class SplitReviewActivity extends AppCompatActivity {
                                     finalMembers.size(), sType, expenseId);
                     } catch (Exception ignored) {}
 
-                    // Split succeeded — update inbox entry status to "added" and cancel
-                    // the system notification. We keep the entry visible in the inbox
-                    // (with the "added" label) so users can review what was split.
+                    // Split succeeded — update inbox entry status to "added", mark it
+                    // as read, cancel the system notification, and refresh the badge.
+                    // FIX: updateStatus() alone does NOT set read=1, so unreadCount()
+                    // still counted it as unread → bell badge never decremented and the
+                    // summary "N payments to split" notification stayed in the drawer.
                     if (inboxEntryId != -1) {
-                        com.splitmanager.app.db.PaymentInboxDb.getInstance(getApplicationContext())
-                            .updateStatus(inboxEntryId,
-                                com.splitmanager.app.db.PaymentInboxDb.STATUS_ADDED);
-                        NotificationHelper.cancelNotificationAndDelete(
-                            getApplicationContext(), inboxNotifId, -1); // -1 = skip DB delete
+                        com.splitmanager.app.db.PaymentInboxDb db =
+                            com.splitmanager.app.db.PaymentInboxDb.getInstance(getApplicationContext());
+                        db.updateStatus(inboxEntryId,
+                            com.splitmanager.app.db.PaymentInboxDb.STATUS_ADDED);
+                        db.markRead(inboxEntryId); // decrement unread count → badge updates
+                        com.splitmanager.app.util.NotificationHelper.cancelNotificationAndDelete(
+                            getApplicationContext(), inboxNotifId, -1); // cancel notif, skip DB delete
+                        // Broadcast so MainActivity refreshes bell badge immediately
+                        androidx.localbroadcastmanager.content.LocalBroadcastManager
+                            .getInstance(getApplicationContext())
+                            .sendBroadcast(new android.content.Intent(
+                                com.splitmanager.app.service.PaymentService.ACTION_BADGE_UPDATED));
                     }
                 }
                 runOnUiThread(() -> {
