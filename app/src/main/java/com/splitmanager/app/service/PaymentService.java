@@ -224,7 +224,7 @@ public class PaymentService extends Service {
             Intent ignoreIntent = new Intent(this, PaymentService.class);
             ignoreIntent.setAction("IGNORE_" + notifId);
             PendingIntent ignorePending = PendingIntent.getService(
-                this, notifId + 1000, ignoreIntent,
+                this, ignoreReqId, ignoreIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
