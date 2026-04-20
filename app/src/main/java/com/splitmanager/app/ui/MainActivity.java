@@ -20,6 +20,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import com.splitmanager.app.BuildConfig;
 import com.splitmanager.app.util.NotificationHelper;
 import com.splitmanager.app.db.PaymentInboxDb;
@@ -29,13 +34,13 @@ import com.splitmanager.app.service.PaymentService;
 import com.splitmanager.app.service.PaymentNotificationListener;
 import com.splitmanager.app.util.SecurePrefsHelper;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "SplitManager.Main";
     private ActivityMainBinding binding;
+    // Single-thread executor for badge DB reads — avoids raw new Thread() calls
+    // which are harder to lifecycle-manage. Shut down in onDestroy().
+    private ExecutorService executor;
 
     /**
      * Receives ACTION_BADGE_UPDATED broadcasts from PaymentService so the bell
@@ -59,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        executor = Executors.newSingleThreadExecutor();
 
         // Check API key safely — SecurePrefsHelper can fail on first launch
         boolean hasKey = false;
@@ -206,8 +212,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateInboxBadge() {
-        new Thread(() -> {
-            int count = PaymentInboxDb.getInstance(this).unreadCount();
+        // Use the activity executor instead of a raw new Thread() — consistent with all
+        // other activities, easier to lifecycle-manage, and avoids unconstrained thread creation
+        // if updateInboxBadge() is called rapidly (e.g. many badge broadcasts in quick succession).
+        if (executor == null || executor.isShutdown()) return;
+        executor.submit(() -> {
+            int count = PaymentInboxDb.getInstance(getApplicationContext()).unreadCount();
             // Sync the system-level badge (app icon) with the same count
             NotificationHelper.refreshBadge(getApplicationContext());
             runOnUiThread(() -> {
@@ -220,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
                     binding.tvInboxBadge.setVisibility(android.view.View.GONE);
                 }
             });
-        }).start();
+        });
     }
 
     @Override
@@ -239,5 +249,16 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         // Unregister so we don't receive broadcasts when the activity is not visible.
         LocalBroadcastManager.getInstance(this).unregisterReceiver(badgeUpdateReceiver);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Shut down the executor to release its thread and prevent any pending
+        // badge updates from running against a destroyed activity.
+        if (executor != null) {
+            executor.shutdown();
+            executor = null;
+        }
     }
 }
