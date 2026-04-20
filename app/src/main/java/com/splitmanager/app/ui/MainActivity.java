@@ -62,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupUI() {
         binding.btnGrantSms.setOnClickListener(v -> requestSmsPermissions());
+        binding.btnHistory.setOnClickListener(v ->
+            startActivity(new Intent(this, HistoryActivity.class)));
         binding.btnGrantNotification.setOnClickListener(v -> openNotificationListenerSettings());
         binding.btnOpenSettings.setOnClickListener(v -> startActivity(new Intent(this, SetupActivity.class)));
         binding.btnConfigureSplitwise.setOnClickListener(v -> startActivity(new Intent(this, SetupActivity.class)));

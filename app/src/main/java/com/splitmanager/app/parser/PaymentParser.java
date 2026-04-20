@@ -90,13 +90,26 @@ public class PaymentParser {
     );
 
     // Catches billing/reminder SMS that are NOT actual debit events
-    // e.g. "suspended due to non-payment", "bill due", "please pay to restore"
     private static final Pattern NON_PAYMENT_FILTER = Pattern.compile(
         "(?:non-payment|due to non.payment|suspended|overdue|bill\s+due|" +
         "minimum\s+due|total\s+due|please\s+pay\s+(?:immediately|now|to)|" +
         "payment\s+due|unpaid|pending\s+payment|pay\s+to\s+restore|" +
         "outstanding\s+(?:amount|dues|balance)|payable|bill\s+dated|" +
         "to\s+avoid\s+disconnection|service\s+suspended|connection\s+suspended)",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    // Catches OTP / login / password messages — never actual payments
+    // These often contain "transaction" or "used" which confuse the debit detector
+    private static final Pattern OTP_FILTER = Pattern.compile(
+        "(?:OTP|one.time.pass(?:word|code)?|login\s+(?:code|otp)|" +
+        "verification\s+(?:code|otp)|security\s+code|" +
+        "do not share|never share|not share.*(?:otp|code|pin)|" +
+        "\b[0-9]{4,8}\s+is\s+(?:your|the)\s+(?:otp|code|pin|password)|" +
+        "(?:your|the)\s+(?:otp|code|pin|password)\s+(?:is|:)\s*[0-9]{4,8}|" +
+        "valid\s+for\s+[0-9]+\s+(?:min|minute|second)|" +
+        "expires?\s+in\s+[0-9]+\s+(?:min|sec)|" +
+        "use\s+[0-9]{4,8}\s+(?:to|for)\s+(?:login|verify|confirm|complete|authenticate))",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -254,6 +267,8 @@ public class PaymentParser {
 
     public static boolean isPaymentMessage(String body) {
         if (body == null || body.length() > MAX_INPUT_LENGTH) return false;
+        // Reject OTP / login / verification codes
+        if (OTP_FILTER.matcher(body).find()) return false;
         // Reject billing reminders, suspension notices, overdue alerts
         if (NON_PAYMENT_FILTER.matcher(body).find()) return false;
         boolean hasDebit  = DEBIT_PATTERN.matcher(body).find();

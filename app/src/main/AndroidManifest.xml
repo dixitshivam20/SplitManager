@@ -77,5 +77,10 @@
             android:foregroundServiceType="dataSync" />
 
 
+        <activity
+            android:name=".ui.HistoryActivity"
+            android:exported="false"
+            android:label="Split History"/>
+
     </application>
 </manifest>

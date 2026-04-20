@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.splitmanager.app.api.SplitwiseApiClient;
+import com.splitmanager.app.db.SplitHistoryDb;
 import com.splitmanager.app.databinding.ActivitySplitReviewBinding;
 import com.splitmanager.app.model.SplitwiseGroup;
 import com.splitmanager.app.service.PaymentService;
@@ -25,10 +26,8 @@ import com.google.android.material.chip.Chip;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -400,7 +399,7 @@ public class SplitReviewActivity extends AppCompatActivity {
                 if (et == null) continue;
                 long sharePaise = perFreePaise + (i == freeIds.size() - 1 ? remainderPaise : 0);
                 et.setText(String.format("%.2f", sharePaise / 100.0)
-                    .replaceAll("\\.00$", ""));
+                    .replaceAll("\.00$", ""));
             }
         }
 
@@ -492,6 +491,15 @@ public class SplitReviewActivity extends AppCompatActivity {
                 String expenseId = apiClient.createCustomSplit(
                     selectedGroup.getId(), amount, description, finalMembers, finalShares);
 
+                // Save to local history
+                if (expenseId != null) {
+                    try {
+                        String sType = splitType == SPLIT_EQUAL ? "Equal" : "Custom";
+                        SplitHistoryDb.getInstance(getApplicationContext())
+                            .insert(amount, description, selectedGroup.getName(),
+                                    finalMembers.size(), sType, expenseId);
+                    } catch (Exception ignored) {}
+                }
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     binding.progressBar.setVisibility(View.GONE);
