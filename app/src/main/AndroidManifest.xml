@@ -78,6 +78,11 @@
 
 
         <activity
+            android:name=".ui.InboxActivity"
+            android:exported="false"
+            android:label="Payment Inbox"/>
+
+        <activity
             android:name=".ui.HistoryActivity"
             android:exported="false"
             android:label="Split History"/>

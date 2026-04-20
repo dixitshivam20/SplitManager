@@ -4,243 +4,347 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="@color/background">
+    android:background="#F5F6FA">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="vertical">
 
-        <!-- Header -->
+        <!-- ── Top Header Bar ─────────────────────────────────────────── -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="64dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="20dp">
+            android:paddingHorizontal="20dp"
+            android:background="#FFFFFF"
+            android:elevation="4dp">
 
-            <TextView
+            <!-- App name + tagline -->
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="SplitManager"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"/>
-
-            <Button
-                android:id="@+id/btn_history"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Split History"
-                android:layout_marginBottom="10dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
-
-            <Button
-                android:id="@+id/btn_open_settings"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:text="Settings"
-                android:textSize="12sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
-        </LinearLayout>
-
-        <!-- Bot Status Card -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/card_background">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="16dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <ImageView
-                    android:id="@+id/iv_bot_status"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/ic_warning"
-                    android:layout_marginEnd="12dp"/>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Bot Status"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"/>
-
-                    <TextView
-                        android:id="@+id/tv_bot_status"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Checking..."
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_primary"/>
-                </LinearLayout>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- Permissions Card -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/card_background">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="16dp"
                 android:orientation="vertical">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Permissions"
-                    android:textSize="16sp"
+                    android:text="SplitManager"
+                    android:textSize="20sp"
                     android:textStyle="bold"
-                    android:textColor="@color/text_primary"
-                    android:layout_marginBottom="12dp"/>
+                    android:textColor="#1B5E20"
+                    android:letterSpacing="0.02"/>
 
-                <!-- SMS Row -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Auto-split every payment"
+                    android:textSize="11sp"
+                    android:textColor="#9E9E9E"/>
+            </LinearLayout>
+
+            <!-- Bell icon + badge, tappable -->
+            <FrameLayout
+                android:id="@+id/btn_inbox"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_bell"/>
+
+                <!-- Red badge — shown when unread > 0 -->
+                <TextView
+                    android:id="@+id/tv_inbox_badge"
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:textSize="9sp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="@drawable/bg_badge"
+                    android:visibility="gone"/>
+            </FrameLayout>
+
+            <!-- Settings gear -->
+            <ImageView
+                android:id="@+id/btn_open_settings"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:padding="10dp"
+                android:src="@drawable/ic_settings"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"/>
+        </LinearLayout>
+
+        <!-- ── Content ───────────────────────────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Bot Status Card -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#E8E8E8"
+                app:cardBackgroundColor="#FFFFFF">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="10dp">
-
-                    <ImageView
-                        android:id="@+id/iv_sms_status"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_close"
-                        android:layout_marginEnd="10dp"/>
-
-                    <TextView
-                        android:id="@+id/tv_sms_status"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="SMS permission needed"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_primary"/>
-
-                    <Button
-                        android:id="@+id/btn_grant_sms"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:text="Grant"
-                        android:textSize="12sp"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
-                </LinearLayout>
-
-                <!-- Notification Row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:padding="16dp"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <ImageView
-                        android:id="@+id/iv_notif_status"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_close"
-                        android:layout_marginEnd="10dp"/>
+                    <!-- Status circle indicator -->
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="14dp">
 
-                    <TextView
-                        android:id="@+id/tv_notif_status"
+                        <View
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="#F1F8E9"/>
+
+                        <ImageView
+                            android:id="@+id/iv_bot_status"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_warning"/>
+                    </FrameLayout>
+
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Notification access needed"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_primary"/>
+                        android:orientation="vertical">
 
-                    <Button
-                        android:id="@+id/btn_grant_notification"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:text="Grant"
-                        android:textSize="12sp"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Bot Status"
+                            android:textSize="11sp"
+                            android:textColor="#9E9E9E"
+                            android:letterSpacing="0.04"/>
+
+                        <TextView
+                            android:id="@+id/tv_bot_status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Checking..."
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:textColor="#212121"/>
+                    </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+            </androidx.cardview.widget.CardView>
 
-        <!-- Splitwise Status -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="@color/card_background">
-
-            <LinearLayout
+            <!-- Permissions Card -->
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="16dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#E8E8E8"
+                app:cardBackgroundColor="#FFFFFF">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:padding="16dp"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Splitwise"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"/>
+                        android:text="Permissions"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="#212121"
+                        android:letterSpacing="0.02"
+                        android:layout_marginBottom="14dp"/>
 
-                    <TextView
-                        android:id="@+id/tv_api_status"
-                        android:layout_width="wrap_content"
+                    <!-- SMS Row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Not configured"
-                        android:textSize="15sp"
-                        android:textColor="@color/text_primary"/>
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <ImageView
+                            android:id="@+id/iv_sms_status"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_close"
+                            android:layout_marginEnd="10dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_sms_status"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="SMS permission needed"
+                            android:textSize="13sp"
+                            android:textColor="#424242"/>
+
+                        <Button
+                            android:id="@+id/btn_grant_sms"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:text="Grant"
+                            android:textSize="11sp"
+                            android:minWidth="0dp"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+                    </LinearLayout>
+
+                    <!-- Notification Row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:id="@+id/iv_notif_status"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_close"
+                            android:layout_marginEnd="10dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_notif_status"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Notification access needed"
+                            android:textSize="13sp"
+                            android:textColor="#424242"/>
+
+                        <Button
+                            android:id="@+id/btn_grant_notification"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:text="Grant"
+                            android:textSize="11sp"
+                            android:minWidth="0dp"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+                    </LinearLayout>
                 </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
-                <Button
-                    android:id="@+id/btn_configure_splitwise"
+            <!-- Splitwise Card -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#E8E8E8"
+                app:cardBackgroundColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Splitwise"
+                            android:textSize="11sp"
+                            android:textColor="#9E9E9E"
+                            android:letterSpacing="0.04"/>
+
+                        <TextView
+                            android:id="@+id/tv_api_status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Not configured"
+                            android:textSize="15sp"
+                            android:textColor="#212121"/>
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btn_configure_splitwise"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Configure"
+                        android:textSize="12sp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Split History — single clean row, no card excess -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Split History"
+                    android:textSize="13sp"
+                    android:textColor="#757575"/>
+
+                <TextView
+                    android:id="@+id/btn_history"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:text="Configure"
-                    android:textSize="12sp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+                    android:layout_height="wrap_content"
+                    android:text="View all →"
+                    android:textSize="13sp"
+                    android:textColor="#1B5E20"
+                    android:textStyle="bold"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="4dp"/>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
-        <!-- Test Button -->
-        <Button
-            android:id="@+id/btn_test_payment"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Simulate Test Payment"
-            android:layout_marginTop="8dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+            <!-- Test Button (debug only) -->
+            <Button
+                android:id="@+id/btn_test_payment"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="Simulate Test Payment"
+                android:layout_marginTop="8dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
