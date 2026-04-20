@@ -11,6 +11,7 @@ import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.splitmanager.app.R;
 import com.splitmanager.app.util.NotificationHelper;
@@ -36,6 +37,10 @@ public class PaymentService extends Service {
     public static final String EXTRA_SOURCE        = "source";
     public static final String EXTRA_SESSION_TOKEN = "session_token";
 
+    /** Broadcast sent whenever the unread badge count changes (ignore or new payment).
+     *  MainActivity listens for this to auto-refresh the bell badge without a full resume. */
+    public static final String ACTION_BADGE_UPDATED = "com.splitmanager.app.BADGE_UPDATED";
+
     private static final String CHANNEL_FOREGROUND = "splitmanager_fg";
     private static final String CHANNEL_PAYMENT    = "splitmanager_payment";
     private static final int    FG_NOTIF_ID        = 1;
@@ -57,6 +62,11 @@ public class PaymentService extends Service {
 
     private String sessionToken;
     private final AtomicInteger paymentNotifId = new AtomicInteger(100);
+    // Separate counter for ignore PendingIntent request codes.
+    // SECURITY FIX: using notifId + 1000 caused a collision — after 1000 payments the ignore
+    // PendingIntent request code for payment N equals the split PendingIntent request code for
+    // payment N+1000, causing Android to reuse the wrong intent. Separate counters eliminate this.
+    private final AtomicInteger ignoreRequestId = new AtomicInteger(10_100);
     private ExecutorService executor;
 
     @Override
@@ -82,7 +92,8 @@ public class PaymentService extends Service {
                 int notifId = Integer.parseInt(action.replace("IGNORE_", ""));
                 // Cancel the system notification
                 NotificationManagerCompat.from(this).cancel(notifId);
-                // Mark the matching inbox entry as read (keeps in-app inbox in sync)
+                // Mark the matching inbox entry as read and set status to ignored so
+                // the in-app inbox shows the correct label without a manual refresh.
                 // We run this on the executor to avoid StrictMode disk-on-main-thread
                 if (executor != null) {
                     final int fNotifId = notifId;
@@ -91,9 +102,16 @@ public class PaymentService extends Service {
                             com.splitmanager.app.db.PaymentInboxDb db =
                                 com.splitmanager.app.db.PaymentInboxDb.getInstance(getApplicationContext());
                             db.markReadByNotifId(fNotifId);
+                            // Set status so inbox shows "ignored" label
+                            db.updateStatusByNotifId(fNotifId,
+                                com.splitmanager.app.db.PaymentInboxDb.STATUS_IGNORED);
                         } catch (Exception ex) {
                             Log.w(TAG, "Could not sync inbox on ignore");
                         }
+                        // Broadcast badge update so MainActivity refreshes the bell
+                        // counter immediately, even while it is in the background.
+                        LocalBroadcastManager.getInstance(getApplicationContext())
+                            .sendBroadcast(new Intent(ACTION_BADGE_UPDATED));
                     });
                 }
                 Log.d(TAG, "Payment notification dismissed by user");
@@ -172,6 +190,7 @@ public class PaymentService extends Service {
             Log.d(TAG, "Processing new payment event");
 
             int notifId = paymentNotifId.getAndIncrement();
+            int ignoreReqId = ignoreRequestId.getAndIncrement();
 
             // Save to inbox so user can split later from the Notifications tab.
             // We store notifId alongside the entry so InboxActivity can cancel
@@ -224,6 +243,9 @@ public class PaymentService extends Service {
                 NotificationManagerCompat.from(this).notify(notifId, notif);
                 // Update app icon badge to reflect new unread count
                 NotificationHelper.refreshBadge(getApplicationContext());
+                // Notify MainActivity to refresh the bell badge counter immediately
+                LocalBroadcastManager.getInstance(getApplicationContext())
+                    .sendBroadcast(new Intent(ACTION_BADGE_UPDATED));
             } catch (SecurityException e) {
                 // POST_NOTIFICATIONS permission not granted — user hasn't approved yet
                 Log.w(TAG, "Cannot post notification — POST_NOTIFICATIONS not granted");

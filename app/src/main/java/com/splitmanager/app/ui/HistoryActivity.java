@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
@@ -31,7 +32,11 @@ public class HistoryActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_history);
-
+        // FLAG_SECURE: prevents screenshots and screen recording of this screen.
+        // Split history contains merchant names, group names, and amounts — PII
+        // that should not appear in recent-apps thumbnails or screen captures.
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE,
+                             WindowManager.LayoutParams.FLAG_SECURE);
         executor = Executors.newSingleThreadExecutor();
 
         if (getSupportActionBar() != null) {

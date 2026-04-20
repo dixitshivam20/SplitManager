@@ -101,15 +101,21 @@ public class PaymentParser {
 
     // Catches OTP / login / password messages — never actual payments
     // These often contain "transaction" or "used" which confuse the debit detector
+    //
+    // SECURITY FIX: "\\b" (four backslashes in source = \b in the compiled string = regex
+    // word boundary) is required. The original "\b" (two backslashes) compiles to a literal
+    // backspace character (0x08) in the Java string, which the regex engine silently ignores,
+    // making the digit-boundary anchor ineffective and allowing OTP messages whose digit
+    // sequences are not at a word boundary to bypass this filter.
     private static final Pattern OTP_FILTER = Pattern.compile(
-        "(?:OTP|one.time.pass(?:word|code)?|login\s+(?:code|otp)|" +
-        "verification\s+(?:code|otp)|security\s+code|" +
+        "(?:OTP|one.time.pass(?:word|code)?|login\\s+(?:code|otp)|" +
+        "verification\\s+(?:code|otp)|security\\s+code|" +
         "do not share|never share|not share.*(?:otp|code|pin)|" +
-        "\b[0-9]{4,8}\s+is\s+(?:your|the)\s+(?:otp|code|pin|password)|" +
-        "(?:your|the)\s+(?:otp|code|pin|password)\s+(?:is|:)\s*[0-9]{4,8}|" +
-        "valid\s+for\s+[0-9]+\s+(?:min|minute|second)|" +
-        "expires?\s+in\s+[0-9]+\s+(?:min|sec)|" +
-        "use\s+[0-9]{4,8}\s+(?:to|for)\s+(?:login|verify|confirm|complete|authenticate))",
+        "\\b[0-9]{4,8}\\b\\s+is\\s+(?:your|the)\\s+(?:otp|code|pin|password)|" +
+        "(?:your|the)\\s+(?:otp|code|pin|password)\\s+(?:is|:)\\s*[0-9]{4,8}\\b|" +
+        "valid\\s+for\\s+[0-9]+\\s+(?:min|minute|second)|" +
+        "expires?\\s+in\\s+[0-9]+\\s+(?:min|sec)|" +
+        "use\\s+[0-9]{4,8}\\b\\s+(?:to|for)\\s+(?:login|verify|confirm|complete|authenticate))",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -255,6 +261,13 @@ public class PaymentParser {
                 return false;
             }
         }
+
+        // SECURITY FIX: if the sender contains '@' but did NOT match any known RCS domain
+        // above, it is an unknown domain address (e.g. "HDFCBANK@evil.com").
+        // Falling through to the DLT path would strip '@' and '.' and then match the bank
+        // ID substring ("HDFCBANK") — incorrectly accepting a spoofed sender.
+        // Reject any '@'-containing sender that isn't a known RCS domain.
+        if (senderLower.contains("@")) return false;
 
         // Traditional DLT SMS sender — strip prefixes like "VM-", "BP-", "TP-"
         String upper = sender.toUpperCase().replaceAll("^[A-Z]{2}-", "").replaceAll("[^A-Z0-9]", "");

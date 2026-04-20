@@ -14,12 +14,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import okio.ByteString;
+
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import okhttp3.CertificatePinner;
 
 public class SplitwiseApiClient {
 
@@ -29,6 +32,9 @@ public class SplitwiseApiClient {
     private static final int    MAX_DESCRIPTION_LENGTH = 100;
     private static final double MAX_AMOUNT = 1_000_000.0;
     private static final double MIN_AMOUNT = 0.01;
+    // Cap API responses at 512 KB to prevent OOM from unexpectedly large payloads.
+    // Normal Splitwise responses are a few KB at most; this is a generous safety margin.
+    private static final long   MAX_RESPONSE_BYTES = 512 * 1024L;
 
     private final OkHttpClient httpClient;
     private final Gson gson;
@@ -53,6 +59,29 @@ public class SplitwiseApiClient {
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false) // Prevent duplicate expense on retry
+            // Certificate pinning — pins the DigiCert intermediate CAs used by Splitwise
+            // (hosted on Cloudflare infrastructure). Pinning intermediates rather than the
+            // leaf cert means the pin survives normal leaf cert rotations. Multiple pins are
+            // provided as a backup set: OkHttp accepts the connection if ANY pin in the set
+            // matches ANY certificate in the chain.
+            //
+            // HOW TO VERIFY / UPDATE PINS:
+            //   openssl s_client -connect secure.splitwise.com:443 -showcerts 2>/dev/null \
+            //     | openssl x509 -pubkey -noout \
+            //     | openssl pkey -pubin -outform der \
+            //     | openssl dgst -sha256 -binary | base64
+            //
+            // If Splitwise migrates away from DigiCert/Cloudflare, update these pins and
+            // ship a new release before the old cert expires (check expiry with:
+            //   openssl s_client -connect secure.splitwise.com:443 2>/dev/null | openssl x509 -noout -dates)
+            .certificatePinner(new CertificatePinner.Builder()
+                // DigiCert SHA2 High Assurance Server CA (primary intermediate)
+                .add("secure.splitwise.com", "sha256/k2v657xBsOVe1PQRwOsHsw3bsGT2VzIqz5K+59sNQws=")
+                // DigiCert TLS RSA SHA256 2020 CA1 (secondary intermediate, Cloudflare)
+                .add("secure.splitwise.com", "sha256/RQeZkB42znUfsDIIFWIRiYEcKl7nHwNFwWCrnMMJbi0=")
+                // DigiCert Global Root CA (backup root — long-lived, rarely rotated)
+                .add("secure.splitwise.com", "sha256/r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=")
+                .build())
             .addInterceptor(chain -> {
                 // Reconstruct key string only for the header, then discard immediately
                 String bearer = "Bearer " + new String(apiKeyChars);
@@ -74,6 +103,30 @@ public class SplitwiseApiClient {
      */
     public void destroy() {
         Arrays.fill(apiKeyChars, '\0');
+    }
+
+    /**
+     * Read a response body with a hard size cap to prevent OOM attacks.
+     * rb.string() reads the full body regardless of size; a malicious/proxied server
+     * returning megabytes of JSON would exhaust heap. We cap at MAX_RESPONSE_BYTES.
+     *
+     * @throws IOException if the body exceeds the size cap
+     */
+    private static String readBodySafe(ResponseBody rb) throws IOException {
+        if (rb == null) return "";
+        long contentLength = rb.contentLength();
+        // contentLength() returns -1 when unknown — we still enforce the cap via buffer read
+        if (contentLength > MAX_RESPONSE_BYTES) {
+            throw new IOException("Response body too large (" + contentLength + " bytes)");
+        }
+        // Read up to MAX_RESPONSE_BYTES+1 bytes; if we get more, reject
+        okio.BufferedSource source = rb.source();
+        okio.Buffer buffer = new okio.Buffer();
+        source.read(buffer, MAX_RESPONSE_BYTES + 1);
+        if (buffer.size() > MAX_RESPONSE_BYTES) {
+            throw new IOException("Response body exceeds size limit");
+        }
+        return buffer.readUtf8();
     }
 
     private static String sanitize(String input, int maxLen) {
@@ -114,7 +167,9 @@ public class SplitwiseApiClient {
 
             ResponseBody rb = resp.body();
             if (rb == null) return "Empty response from Splitwise. Check your internet connection.";
-            String body = rb.string();
+            String body;
+            try { body = readBodySafe(rb); }
+            catch (IOException e) { return "Response from Splitwise was too large or unreadable."; }
 
             JsonObject json = gson.fromJson(body, JsonObject.class);
             if (json == null) return "Could not parse Splitwise response. Try again.";
@@ -155,7 +210,7 @@ public class SplitwiseApiClient {
             if (!resp.isSuccessful() || rb == null) {
                 throw new IOException("Failed to fetch groups: " + resp.code());
             }
-            String body = rb.string();
+            String body = readBodySafe(rb);
 
             JsonObject json = gson.fromJson(body, JsonObject.class);
             if (json == null) return new ArrayList<>();
@@ -285,7 +340,7 @@ public class SplitwiseApiClient {
             resp = httpClient.newCall(req).execute();
             ResponseBody rb = resp.body();
             if (rb == null) throw new IOException("Empty response from Splitwise");
-            String respBody = rb.string();
+            String respBody = readBodySafe(rb);
 
             if (!resp.isSuccessful()) {
                 Log.e(TAG, "Create expense failed: HTTP " + resp.code());

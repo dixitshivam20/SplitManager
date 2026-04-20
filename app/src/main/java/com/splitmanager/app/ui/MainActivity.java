@@ -3,6 +3,8 @@ package com.splitmanager.app.ui;
 import android.Manifest;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -16,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.splitmanager.app.BuildConfig;
 import com.splitmanager.app.util.NotificationHelper;
@@ -33,6 +36,18 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "SplitManager.Main";
     private ActivityMainBinding binding;
+
+    /**
+     * Receives ACTION_BADGE_UPDATED broadcasts from PaymentService so the bell
+     * badge refreshes immediately when the user taps Split / Ignore on a system
+     * notification — without needing to navigate away and back.
+     */
+    private final BroadcastReceiver badgeUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context context, Intent intent) {
+            updateInboxBadge();
+        }
+    };
 
     private final ActivityResultLauncher<String[]> permissionLauncher =
         registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), results -> {
@@ -212,5 +227,17 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         refreshStatus(); // lightweight — does NOT re-register click listeners
+        // Register for live badge updates while the activity is visible.
+        // Paired with unregister in onPause to avoid leaks.
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            badgeUpdateReceiver,
+            new IntentFilter(com.splitmanager.app.service.PaymentService.ACTION_BADGE_UPDATED));
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Unregister so we don't receive broadcasts when the activity is not visible.
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(badgeUpdateReceiver);
     }
 }

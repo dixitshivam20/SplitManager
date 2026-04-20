@@ -110,14 +110,20 @@ public class SplitReviewActivity extends AppCompatActivity {
 
         binding.btnSplitConfirm.setOnClickListener(v -> confirmSplit());
         // Ignore button: close the screen.
-        // If opened from the inbox, also cancel the system notification and mark as read.
+        // If opened from the inbox, also cancel the system notification,
+        // mark the entry as read, and set its status to "ignored".
         binding.btnIgnore.setOnClickListener(v -> {
             if (inboxEntryId != -1) {
                 final long fId = inboxEntryId;
                 final int  fNid = inboxNotifId;
-                executor.submit(() ->
+                executor.submit(() -> {
+                    // Set status to ignored so the inbox shows the correct label
+                    com.splitmanager.app.db.PaymentInboxDb.getInstance(getApplicationContext())
+                        .updateStatus(fId,
+                            com.splitmanager.app.db.PaymentInboxDb.STATUS_IGNORED);
                     NotificationHelper.cancelNotificationAndMarkRead(
-                        getApplicationContext(), fNid, fId));
+                        getApplicationContext(), fNid, fId);
+                });
             }
             finish();
         });
@@ -524,11 +530,15 @@ public class SplitReviewActivity extends AppCompatActivity {
                                     finalMembers.size(), sType, expenseId);
                     } catch (Exception ignored) {}
 
-                    // Split succeeded — remove from inbox and cancel system notification.
-                    // The entry has been handled; keeping it would confuse the user.
+                    // Split succeeded — update inbox entry status to "added" and cancel
+                    // the system notification. We keep the entry visible in the inbox
+                    // (with the "added" label) so users can review what was split.
                     if (inboxEntryId != -1) {
+                        com.splitmanager.app.db.PaymentInboxDb.getInstance(getApplicationContext())
+                            .updateStatus(inboxEntryId,
+                                com.splitmanager.app.db.PaymentInboxDb.STATUS_ADDED);
                         NotificationHelper.cancelNotificationAndDelete(
-                            getApplicationContext(), inboxNotifId, inboxEntryId);
+                            getApplicationContext(), inboxNotifId, -1); // -1 = skip DB delete
                     }
                 }
                 runOnUiThread(() -> {
@@ -542,7 +552,9 @@ public class SplitReviewActivity extends AppCompatActivity {
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Split creation error", e);
-                final String errMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
+                // SECURITY: never show raw e.getMessage() to the user — it can contain internal
+                // API response fragments, HTTP status details, or stack paths. Map to safe strings.
+                final String errMsg = sanitizeErrorForUi(e.getMessage());
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     binding.progressBar.setVisibility(View.GONE);
@@ -564,6 +576,45 @@ public class SplitReviewActivity extends AppCompatActivity {
         binding.tvSuccessGroup.setText(selectedGroup.getName());
         binding.tvSuccessMembers.setText(memberCount + " people notified on Splitwise");
         binding.btnDone.setOnClickListener(v -> finish());
+    }
+
+    /**
+     * Maps raw exception messages to safe, user-readable strings.
+     *
+     * SECURITY: raw exception messages from IOException / SplitwiseApiClient can contain
+     * HTTP status codes, partial API response bodies, or internal path fragments that should
+     * not be displayed to the user or appear in screenshots. Only whitelisted messages that
+     * are already user-friendly are passed through; everything else becomes a generic fallback.
+     *
+     * FIX: all whitelist checks use toLowerCase() to handle variable casing from the
+     * Splitwise API (e.g. "Owed shares..." vs "owed shares...").
+     */
+    private static String sanitizeErrorForUi(String raw) {
+        if (raw == null || raw.isEmpty()) return "Could not create split. Please try again.";
+        // Whitelist: messages explicitly written for the user in SplitwiseApiClient
+        if (raw.equals("Not authenticated"))
+            return "Splitwise session expired. Please re-enter your API key in Settings.";
+        if (raw.startsWith("Amount out of valid range"))
+            return "Payment amount is outside the accepted range.";
+        if (raw.equals("Invalid amount value"))
+            return "Payment amount is invalid. Please try again.";
+        if (raw.equals("Members/shares count mismatch"))
+            return "Split configuration error. Please re-select the group and try again.";
+        if (raw.equals("Empty response from Splitwise"))
+            return "No response from Splitwise. Check your internet connection.";
+        if (raw.equals("Could not parse Splitwise response"))
+            return "Unexpected response from Splitwise. Please try again.";
+        // Splitwise API-level error messages are safe (they come from Splitwise's own error field).
+        // Use case-insensitive matching — Splitwise capitalises these inconsistently across
+        // API versions (e.g. "Owed shares..." vs "owed shares...").
+        // Cap length to prevent excessively long strings appearing in the UI.
+        String rawLower = raw.toLowerCase();
+        if (rawLower.startsWith("splitwise rejected") || rawLower.contains("owed shares")
+                || rawLower.contains("paid shares")) {
+            return raw.length() > 120 ? raw.substring(0, 120) + "\u2026" : raw;
+        }
+        // Everything else (HTTP codes, network errors, internal paths) → generic message
+        return "Could not create split. Check your connection and try again.";
     }
 
     private void showError(String msg) {
