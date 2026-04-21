@@ -106,7 +106,6 @@
                     android:textColor="@color/accent_green"
                     android:inputType="numberDecimal"
                     android:hint="0"
-                    android:hintTextColor="#BBBBBB"
                     android:background="@android:color/transparent"
                     android:importantForAutofill="no"
                     android:singleLine="true"
