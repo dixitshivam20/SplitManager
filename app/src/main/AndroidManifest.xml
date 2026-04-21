@@ -42,12 +42,31 @@
             android:screenOrientation="sensorPortrait"/>
 
         <activity
-            android:name="com.splitmanager.app.ui.SplitReviewActivity"
+            android:name=".ui.SplitReviewActivity"
             android:exported="false"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:allowTaskReparenting="false"
             android:screenOrientation="sensorPortrait"/>
+
+        <!-- Share target — appears in Android share sheet when user shares text from
+             any app (Messages, WhatsApp, etc.). Parses the shared text for a payment
+             amount and opens SplitReviewActivity pre-filled with the result.
+             exported=true is REQUIRED for share targets; the intent carries only
+             plain text (no sensitive app data), so this is safe. -->
+        <activity
+            android:name=".ui.ShareTargetActivity"
+            android:exported="true"
+            android:label="Split with SplitManager"
+            android:taskAffinity=""
+            android:allowTaskReparenting="false"
+            android:screenOrientation="sensorPortrait">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
 
         <receiver
             android:name="com.splitmanager.app.service.SmsReceiver"
