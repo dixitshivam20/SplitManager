@@ -89,10 +89,16 @@ public class PaymentNotificationListener extends NotificationListenerService {
         // Explicit component intent — not raw message passed
         Intent serviceIntent = new Intent(this, PaymentService.class);
         serviceIntent.setAction(PaymentService.ACTION_NEW_PAYMENT);
-        serviceIntent.putExtra(PaymentService.EXTRA_AMOUNT,   event.getAmount());
-        serviceIntent.putExtra(PaymentService.EXTRA_MERCHANT, event.getMerchant());
-        serviceIntent.putExtra(PaymentService.EXTRA_METHOD,   event.getMethod().name());
-        serviceIntent.putExtra(PaymentService.EXTRA_SOURCE,   event.getSource());
+        serviceIntent.putExtra(PaymentService.EXTRA_AMOUNT,     event.getAmount());
+        serviceIntent.putExtra(PaymentService.EXTRA_MERCHANT,   event.getMerchant());
+        serviceIntent.putExtra(PaymentService.EXTRA_METHOD,     event.getMethod().name());
+        serviceIntent.putExtra(PaymentService.EXTRA_SOURCE,     event.getSource());
+        // FIX: include the parsed reference ID (UPI ref, IMPS ref, etc.) so
+        // PaymentService builds the same dedupKey as the SMS path.
+        // Without this, SMS path uses "amount:611052968327" and notification path
+        // uses "amount:AVNEESH FAST" — different keys, dedup misses the duplicate,
+        // and the user sees two split notifications for the same transaction.
+        serviceIntent.putExtra(PaymentService.EXTRA_REFERENCE,  event.getReferenceId());
         serviceIntent.putExtra(PaymentService.EXTRA_SESSION_TOKEN, PaymentService.getCurrentToken());
         try {
             startForegroundService(serviceIntent);
