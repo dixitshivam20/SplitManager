@@ -99,6 +99,58 @@ public class PaymentParser {
         Pattern.CASE_INSENSITIVE
     );
 
+    // Catches promotional / marketing messages — loan offers, credit limit ads, EMI schemes,
+    // insurance ads — that contain an amount and slip past the debit detector because they
+    // use words like "approved". Unlike NON_PAYMENT_FILTER (billing reminders), these are
+    // unsolicited offers that were never actual transactions.
+    //
+    // Key design rules (to avoid false positives on real payment messages):
+    //   - "approved for a loan/credit" → promo. "transaction approved, Rs.X debited" → real.
+    //   - "up to Rs. X" → promo (ceiling). Real debits always state the exact amount.
+    //   - "insurance premium starting/for Rs." → ad. "insurance premium of Rs. X debited" → real.
+    //   - "no cost EMI / 0% EMI" → always a purchase offer, never a debit confirmation.
+    private static final Pattern PROMOTIONAL_FILTER = Pattern.compile(
+        "(?:" +
+        // Loan offers — 'approved/pre-approved for a loan/credit' is promotional;
+        // 'transaction approved' / 'payment approved' (no loan/credit noun after) is real.
+        "pre.?approved\\s+(?:for\\s+)?(?:a\\s+)?(?:loan|credit|offer)|" +
+        "(?:pre.?approved|approved)\\s+for\\s+(?:a\\s+)?(?:loan|credit\\s+limit|personal\\s+loan|home\\s+loan|car\\s+loan|gold\\s+loan|business\\s+loan|instant\\s+loan)|" +
+        "eligible\\s+for\\s+(?:a\\s+)?(?:loan|credit|offer)|" +
+        "avail\\s+(?:a\\s+)?(?:loan|credit|offer)|" +
+        "(?:personal|home|car|business|gold|instant)\\s+loan\\s+(?:offer|approved|available|up\\s+to)|" +
+        "loan\\s+(?:offer|approved|available|amount|limit)\\s+(?:of\\s+)?(?:up\\s+to\\s+)?(?:Rs\\.?|INR|\\u20B9)|" +
+        // 'up to Rs.' / 'get up to Rs.' — ceiling phrasing is unique to promotions;
+        // real debit alerts always state the exact amount debited, never a ceiling.
+        "(?:up\\s+to|upto)\\s+(?:Rs\\.?|INR|\\u20B9)|" +
+        "get\\s+(?:up\\s+to|upto)\\s+(?:Rs\\.?|INR|\\u20B9)|" +
+        // Credit limit increase offers
+        "credit\\s+limit\\s+(?:has\\s+been\\s+)?(?:increased|enhanced|upgraded|raised)|" +
+        "(?:increase|enhance|upgrade|raise)\\s+(?:your\\s+)?credit\\s+limit|" +
+        "your\\s+credit\\s+limit\\s+(?:is\\s+now|has\\s+been\\s+set|will\\s+be)|" +
+        // Insurance offers — requires offer-pricing language (for/starting/at Rs.) to
+        // avoid blocking real insurance premium debits ("insurance premium of Rs. X debited")
+        "(?:term|life|health|motor|vehicle)\\s+insurance\\s+(?:for|from|at|starting)\\s+(?:Rs\\.?|INR|\\u20B9)|" +
+        "insurance\\s+(?:plan|offer|policy)\\s+(?:for|from|at|starting)\\s+(?:Rs\\.?|INR|\\u20B9)|" +
+        "insurance\\s+premium\\s+(?:starting|as\\s+low\\s+as|just)\\s+(?:Rs\\.?|INR|\\u20B9)|" +
+        // Promotional CTAs with URLs — "apply/get now https://..." is a definitive promo signal
+        "(?:apply\\s+now|click\\s+here|get\\s+now|avail\\s+now)\\s*(?:at\\s+)?https?://|" +
+        "(?:limited\\s+time|special|exclusive|festive|pre.?launch)\\s+offer|" +
+        "offer\\s+(?:valid|expires?|ends?)\\s+(?:till|until|on)|" +
+        // You are eligible / selected / pre-qualified for something
+        "you\\s+(?:are|have\\s+been)\\s+(?:eligible|selected|chosen|pre.?qualified)\\s+for|" +
+        "congratulations[,!]?\\s+you.?(?:ve|r|re)?\\s+(?:been\\s+)?(?:pre.?)?approved\\s+for|" +
+        // EMI schemes — 'no cost EMI' / '0% EMI' are always purchase promotions,
+        // never debit confirmations. 'EMI of Rs. X debited' (real) does not match these.
+        "(?:no[\\s\\-]cost\\s+emi|0%\\s+emi|zero\\s+(?:cost\\s+)?emi)|" +
+        "emi\\s+(?:starts?\\s+(?:from|at)|starting\\s+(?:from\\s+)?(?:at\\s+)?|of\\s+just\\s+|as\\s+low\\s+as\\s+)(?:Rs\\.?|INR|\\u20B9)|" +
+        // Earn/win cashback ads — distinct from actual cashback credits to your account
+        "(?:earn|win)\\s+(?:up\\s+to\\s+)?(?:Rs\\.?|INR|\\u20B9)\\s*[0-9,]+\\s*(?:cashback|reward|bonus)\\s+on\\s+(?:every|your\\s+next)|" +
+        // Pre-qualified / pre-selected for a loan/credit
+        "(?:pre.?qualified|pre.?selected)\\s+for\\s+(?:a\\s+)?(?:loan|credit|offer)" +
+        ")",
+        Pattern.CASE_INSENSITIVE
+    );
+
     // Catches OTP / login / password messages — never actual payments
     // These often contain "transaction" or "used" which confuse the debit detector
     //
@@ -284,6 +336,11 @@ public class PaymentParser {
         if (OTP_FILTER.matcher(body).find()) return false;
         // Reject billing reminders, suspension notices, overdue alerts
         if (NON_PAYMENT_FILTER.matcher(body).find()) return false;
+        // Reject promotional messages — loan offers, credit limit ads, EMI schemes,
+        // insurance ads — that contain amounts but are not actual debit transactions.
+        // e.g. "pre-approved for a loan up to Rs. 9,00,000" passes the debit detector
+        // because "approved" and the amount match, but PROMOTIONAL_FILTER catches it.
+        if (PROMOTIONAL_FILTER.matcher(body).find()) return false;
         boolean hasDebit  = DEBIT_PATTERN.matcher(body).find();
         boolean hasAmount = hasDebitAmount(body);
         return hasAmount && hasDebit && !isPureCredit(body);
