@@ -92,10 +92,35 @@ public class SplitReviewActivity extends AppCompatActivity {
         inboxEntryId = getIntent().getLongExtra("inbox_entry_id", -1);
         inboxNotifId = getIntent().getIntExtra("inbox_notif_id", -1);
 
-        binding.tvAmount.setText(String.format("\u20B9%.0f", amount));
+        binding.tvAmount.setText(String.format("%.0f", amount));
         binding.tvMerchant.setText(merchant != null ? merchant : "Unknown");
         binding.tvMethod.setText(method != null ? method.replace("_", " ") : "Payment");
         binding.tvSource.setText(source != null ? source : "SMS");
+
+        // Amount field is now an EditText — listen for user edits and re-distribute
+        // the split immediately. This handles both the auto-parsed amount and the
+        // case where the user shares a message and wants to adjust the figure.
+        binding.tvAmount.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(android.text.Editable s) {
+                double newAmount = parseAmountField(s.toString());
+                if (newAmount > 0 && newAmount < 1_000_000
+                        && !Double.isNaN(newAmount) && !Double.isInfinite(newAmount)) {
+                    amount = newAmount;
+                    // Re-distribute split with the new amount, if a group is already selected
+                    if (selectedGroup != null) {
+                        manuallyEditedMembers.clear();
+                        redistributeEquallyAmongChecked();
+                    }
+                    binding.tvError.setVisibility(View.GONE);
+                } else if (!s.toString().isEmpty()) {
+                    binding.tvError.setText("Enter a valid amount (₹0.01 – ₹9,99,999)");
+                    binding.tvError.setVisibility(View.VISIBLE);
+                    binding.btnSplitConfirm.setEnabled(false);
+                }
+            }
+        });
 
         String apiKey = "";
         try { apiKey = SecurePrefsHelper.getApiKey(this); } catch (Exception ignored) {}
@@ -638,9 +663,25 @@ public class SplitReviewActivity extends AppCompatActivity {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Parses a member share field value (plain number, may have commas). */
     private static double parseAmount(String s) {
         try { return Double.parseDouble(s.trim()); }
         catch (NumberFormatException e) { return 0; }
+    }
+
+    /**
+     * Parses the editable amount field — strips the ₹ prefix if the user
+     * typed it, and handles commas (e.g. "1,200" → 1200.0).
+     */
+    private static double parseAmountField(String s) {
+        if (s == null) return -1;
+        try {
+            return Double.parseDouble(
+                s.trim()
+                 .replace("\u20B9", "") // strip ₹ if user typed it
+                 .replace(",", "")
+            );
+        } catch (NumberFormatException e) { return -1; }
     }
 
     @Override
