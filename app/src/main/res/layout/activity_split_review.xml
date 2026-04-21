@@ -37,15 +37,38 @@
                 android:padding="20dp"
                 android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tv_amount"
+                <!-- Amount — tappable EditText so user can correct the parsed amount -->
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="₹0"
-                    android:textSize="40sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/accent_green"
-                    android:layout_marginBottom="4dp"/>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+
+                    <EditText
+                        android:id="@+id/tv_amount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="₹0"
+                        android:textSize="40sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/accent_green"
+                        android:inputType="numberDecimal"
+                        android:background="@android:color/transparent"
+                        android:importantForAutofill="no"
+                        android:hint="₹0"
+                        android:singleLine="true"
+                        android:minWidth="60dp"
+                        android:contentDescription="Edit payment amount"/>
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_settings"
+                        android:alpha="0.35"
+                        android:layout_marginStart="6dp"
+                        android:contentDescription="Tap amount to edit"/>
+                </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
